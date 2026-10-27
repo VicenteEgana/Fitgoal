@@ -44,10 +44,20 @@ class PlanTab extends StatelessWidget {
     if (context.mounted) showMessage(context, message);
   }
 
+  /// Cambia la sesión de día y devuelve la nueva fecha (o null si la persona no la movió).
+  Future<String?> _move(BuildContext context, String sessionId, Future<void> Function() reload) async {
+    final moved = await moveSession(context, api, sessionId);
+    if (moved == null) return null;
+    await reload();
+    if (context.mounted) showMessage(context, moved.message);
+    return moved.date;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Loader<Map<String, dynamic>>(
       load: _load,
+      keepPrevious: true,
       builder: (context, data, reload) {
         final plan = data['plan'] as Map<String, dynamic>?;
         final profile = data['profile'] as Map<String, dynamic>?;
@@ -60,8 +70,11 @@ class PlanTab extends StatelessWidget {
             .toList();
         final profileChanged = plan != null && profile != null && (profile['version'] as int) > (plan['profileVersion'] as int);
         final hasHistory = streak != null && ((streak['best'] as int) > 0 || plan != null);
+        // La sesión de hoy, si todavía se puede hacer: la tarjeta de la racha la ofrece arriba, sin tener que buscarla.
+        final todayEntry = ((data['schedule'] as Map<String, dynamic>)['days'] as List).cast<Map<String, dynamic>>().where((day) => day['isToday'] == true).firstOrNull;
+        final todaySession = todayEntry?['session'] as Map<String, dynamic>?;
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
             if (plan == null)
               SectionCard(
@@ -75,7 +88,57 @@ class PlanTab extends StatelessWidget {
                   ]),
                 ],
               ),
-            if (hasHistory) _StreakCard(streak: streak),
+            if (hasHistory)
+              _StreakCard(
+                streak: streak,
+                todaySession: todaySession?['canRegister'] == true ? todaySession : null,
+                onTrain: (session) => _train(context, session, weightsEnabled, reload),
+              ),
+            if (unregistered.isNotEmpty)
+              SectionCard(
+                title: 'Sin registrar',
+                children: [
+                  Text('¿La hiciste? Regístrala para que tu progreso refleje lo que hiciste. ¿No pudiste? Cámbiala a otro día.', style: Theme.of(context).textTheme.bodySmall),
+                  for (final session in unregistered)
+                    Padding(
+                      key: Key('unregistered-${session['id']}'),
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Icon(Icons.radio_button_unchecked, size: 20, color: Theme.of(context).colorScheme.error),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(session['label'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              Text(formatLongDate(session['plannedDate'] as String), style: Theme.of(context).textTheme.bodySmall),
+                            ]),
+                          ),
+                        ]),
+                        const SizedBox(height: 8),
+                        Row(children: [
+                          Expanded(
+                            child: FilledButton.tonal(
+                              key: Key('complete-${session['id']}'),
+                              onPressed: () => _register(context, session, session['label'] as String, weightsEnabled, reload),
+                              child: const Text('Registrar'),
+                            ),
+                          ),
+                          if (session['canMove'] == true) ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                key: Key('move-${session['id']}'),
+                                onPressed: () => _move(context, session['id'] as String, reload),
+                                icon: const Icon(Icons.event_repeat, size: 18),
+                                label: const Text('Cambiar de día'),
+                              ),
+                            ),
+                          ],
+                        ]),
+                      ]),
+                    ),
+                ],
+              ),
             if (plan != null || hasHistory)
               _WeekCard(
                 api: api,
@@ -83,25 +146,7 @@ class PlanTab extends StatelessWidget {
                 onGoToRoutines: onGoToRoutines,
                 onTrain: (session) => _train(context, session, weightsEnabled, reload),
                 onRegister: (session) => _register(context, session, session['name'] as String, weightsEnabled, reload),
-              ),
-            if (unregistered.isNotEmpty)
-              SectionCard(
-                title: 'Sin registrar',
-                children: [
-                  Text('Si las hiciste, regístralas: así tu progreso refleja lo que hiciste.', style: Theme.of(context).textTheme.bodySmall),
-                  for (final session in unregistered)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.radio_button_unchecked),
-                      title: Text(session['label'] as String),
-                      subtitle: Text(formatDate(session['plannedDate'] as String)),
-                      trailing: FilledButton.tonal(
-                        key: Key('complete-${session['id']}'),
-                        onPressed: () => _register(context, session, session['label'] as String, weightsEnabled, reload),
-                        child: const Text('Registrar'),
-                      ),
-                    ),
-                ],
+                onMove: (session) => _move(context, session['id'] as String, reload),
               ),
             if (plan != null) _PlanCard(plan: plan, profileChanged: profileChanged, onGoToRoutines: onGoToRoutines),
             _ProgressCard(progress: progress),
@@ -112,10 +157,13 @@ class PlanTab extends StatelessWidget {
   }
 }
 
-/// Racha de días seguidos cumpliendo el plan: las sesiones registradas y los días de descanso suman.
+/// Racha de días seguidos cumpliendo el plan: las sesiones registradas y los días de descanso suman. Si hoy toca entrenar,
+/// ofrece empezar la sesión desde aquí.
 class _StreakCard extends StatelessWidget {
-  const _StreakCard({required this.streak});
+  const _StreakCard({required this.streak, required this.todaySession, required this.onTrain});
   final Map<String, dynamic> streak;
+  final Map<String, dynamic>? todaySession;
+  final void Function(Map<String, dynamic> session) onTrain;
 
   String _message() {
     final current = streak['current'] as int;
@@ -125,6 +173,7 @@ class _StreakCard extends StatelessWidget {
     return switch (streak['today']) {
       'pendiente' => 'Hoy te toca entrenar: registra tu sesión para sumar un día.',
       'hecho' => 'Listo por hoy: tu sesión ya está registrada.',
+      'movida' => 'Moviste la sesión de hoy a otro día: hoy no suma ni corta tu racha.',
       'descanso' when current > 0 => 'Hoy descansas: el descanso también suma a tu racha.',
       'sin_rutina' when current > 0 => 'Tu rutina terminó: empieza otra hoy para no perder tu racha.',
       _ when current == 0 && lastMissed != null => 'Lo importante es no fallar dos veces seguidas: registra tu próxima sesión y tu racha vuelve a empezar.',
@@ -144,6 +193,7 @@ class _StreakCard extends StatelessWidget {
           '• La sesión de hoy no corta la racha mientras el día no termine.\n'
           '• Comodín semanal: si una semana te falta registrar una sesión, la racha no se corta (ese día no suma). La segunda sesión sin registrar de la semana sí la corta.\n'
           '• Si la hiciste y olvidaste registrarla, regístrala después y cuenta.\n'
+          '• Si no puedes entrenar un día, cambia la sesión a otro día libre (hasta una semana después): ese día no suma ni corta tu racha.\n'
           '• Tu adherencia no cambia: una sesión sin registrar siempre cuenta como no realizada.',
         ),
         actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Entendido'))],
@@ -167,11 +217,16 @@ class _StreakCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              Icon(Icons.local_fire_department, size: 44, color: current > 0 ? Colors.deepOrange : scheme.outline),
-              const SizedBox(width: 8),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(color: scheme.surface.withValues(alpha: 0.5), shape: BoxShape.circle),
+                child: Icon(Icons.local_fire_department, size: 36, color: current > 0 ? Colors.deepOrange : scheme.outline),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('$current', key: const Key('streak-count'), style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, color: scheme.onPrimaryContainer)),
+                  Text('$current', key: const Key('streak-count'), style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, color: scheme.onPrimaryContainer, height: 1.1)),
                   Text(current == 1 ? 'día de racha' : 'días de racha', style: TextStyle(color: scheme.onPrimaryContainer)),
                 ]),
               ),
@@ -199,6 +254,18 @@ class _StreakCard extends StatelessWidget {
                 TextButton(key: const Key('streak-info'), onPressed: () => _explain(context), child: const Text('¿Cómo funciona?')),
               ]),
             ],
+            if (todaySession case final session?) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const Key('hero-start-session'),
+                  onPressed: () => onTrain(session),
+                  icon: const Icon(Icons.play_arrow),
+                  label: Text('Empezar: ${session['name']}', overflow: TextOverflow.ellipsis),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -208,12 +275,13 @@ class _StreakCard extends StatelessWidget {
 
 /// Horario semanal: lunes a domingo con el estado de cada día; al tocar un día se ve su sesión o su descanso.
 class _WeekCard extends StatefulWidget {
-  const _WeekCard({required this.api, required this.initial, required this.onGoToRoutines, required this.onTrain, required this.onRegister});
+  const _WeekCard({required this.api, required this.initial, required this.onGoToRoutines, required this.onTrain, required this.onRegister, required this.onMove});
   final ApiClient api;
   final Map<String, dynamic> initial;
   final VoidCallback onGoToRoutines;
   final void Function(Map<String, dynamic> session) onTrain;
   final void Function(Map<String, dynamic> session) onRegister;
+  final Future<String?> Function(Map<String, dynamic> session) onMove;
 
   @override
   State<_WeekCard> createState() => _WeekCardState();
@@ -223,24 +291,68 @@ class _WeekCardState extends State<_WeekCard> {
   late Map<String, dynamic> _week = widget.initial;
   late String _selected = _defaultDay(widget.initial);
   bool _loading = false;
+  /// Tras mover una sesión, al llegar los datos nuevos se vuelve a mostrar la tarjeta (la lista pudo cambiar de alto).
+  bool _reveal = false;
 
   static String _defaultDay(Map<String, dynamic> week) {
     final days = (week['days'] as List).cast<Map<String, dynamic>>();
     return (days.firstWhere((day) => day['isToday'] == true, orElse: () => days.first))['date'] as String;
   }
 
-  Future<void> _go(String? date) async {
+  bool _contains(Map<String, dynamic> week, String date) => (week['days'] as List).any((day) => day['date'] == date);
+
+  /// Tras recargar «Mi rutina» (por ejemplo, al registrar o mover una sesión) se actualiza la semana que se está viendo,
+  /// sin perder el día elegido.
+  @override
+  void didUpdateWidget(_WeekCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(widget.initial, oldWidget.initial)) return;
+    if (_reveal) {
+      _reveal = false;
+      _revealSoon();
+    }
+    if (_week['weekStart'] == widget.initial['weekStart']) {
+      _week = widget.initial;
+      if (!_contains(_week, _selected)) _selected = _defaultDay(_week);
+    } else {
+      _go(_week['weekStart'] as String, select: _selected);
+    }
+  }
+
+  /// Muestra la semana de `date`, con `select` (o hoy, o el lunes) como día elegido.
+  Future<void> _go(String? date, {String? select}) async {
     if (date == null || _loading) return;
     setState(() => _loading = true);
     try {
       final week = await widget.api.get('/api/schedule/me?date=$date') as Map<String, dynamic>;
-      if (mounted) setState(() { _week = week; _selected = _defaultDay(week); _loading = false; });
+      if (mounted) setState(() { _week = week; _selected = select != null && _contains(week, select) ? select : _defaultDay(week); _loading = false; });
     } on ApiException catch (error) {
       if (mounted) {
         setState(() => _loading = false);
         showMessage(context, error.message);
       }
     }
+  }
+
+  void _show(String date) {
+    if (_contains(_week, date)) {
+      setState(() => _selected = date);
+    } else {
+      _go(date, select: date);
+    }
+  }
+
+  void _revealSoon() => WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted) Scrollable.ensureVisible(context, alignment: 0.05, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+  });
+
+  /// Mueve la sesión y deja a la vista su nuevo día.
+  Future<void> _move(Map<String, dynamic> session) async {
+    final date = await widget.onMove(session);
+    if (date == null || !mounted) return;
+    _reveal = true;
+    _show(date);
+    _revealSoon();
   }
 
   @override
@@ -273,6 +385,8 @@ class _WeekCardState extends State<_WeekCard> {
           onGoToRoutines: widget.onGoToRoutines,
           onTrain: widget.onTrain,
           onRegister: widget.onRegister,
+          onMove: _move,
+          onShowDay: _show,
         ),
       ],
     );
@@ -322,15 +436,21 @@ class _DayCell extends StatelessWidget {
   }
 }
 
-/// Lo que toca el día elegido: la sesión con sus ejercicios (y empezarla o registrarla), el descanso o nada.
+/// Lo que toca el día elegido: la sesión con sus ejercicios (y empezarla, registrarla o cambiarla de día), el descanso, el
+/// aviso de que la sesión se movió a otro día o nada.
 class _DayDetail extends StatelessWidget {
-  const _DayDetail({required this.day, required this.today, required this.restSuggestions, required this.onGoToRoutines, required this.onTrain, required this.onRegister});
+  const _DayDetail({
+    required this.day, required this.today, required this.restSuggestions, required this.onGoToRoutines, required this.onTrain, required this.onRegister,
+    required this.onMove, required this.onShowDay,
+  });
   final Map<String, dynamic> day;
   final String today;
   final List<Map<String, dynamic>> restSuggestions;
   final VoidCallback onGoToRoutines;
   final void Function(Map<String, dynamic> session) onTrain;
   final void Function(Map<String, dynamic> session) onRegister;
+  final void Function(Map<String, dynamic> session) onMove;
+  final void Function(String date) onShowDay;
 
   @override
   Widget build(BuildContext context) {
@@ -339,6 +459,13 @@ class _DayDetail extends StatelessWidget {
     final session = day['session'] as Map<String, dynamic>?;
     final heading = '${day['isToday'] == true ? 'Hoy · ' : ''}${formatLongDate(day['date'] as String)}';
     final style = dayStatusStyle(context, status);
+    final canMove = session?['canMove'] == true;
+    Widget moveButton(Map<String, dynamic> session) => OutlinedButton.icon(
+      key: Key('day-move-${session['id']}'),
+      onPressed: () => onMove(session),
+      icon: const Icon(Icons.event_repeat, size: 18),
+      label: const Text('Cambiar de día'),
+    );
     return Column(
       key: Key('day-detail-${day['date']}'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,7 +486,7 @@ class _DayDetail extends StatelessWidget {
                 switch (status) {
                   'hecho' => 'Realizada${session['note'] == null ? '' : ' · «${session['note']}»'}',
                   'comodin' => 'Sin registrar: la cubrió tu comodín semanal y tu racha sigue.',
-                  'perdido' => 'Sin registrar.',
+                  'perdido' => canMove ? 'Sin registrar. Si no pudiste hacerla, cámbiala a otro día.' : 'Sin registrar.',
                   'pendiente' => 'Te toca hoy.',
                   _ => 'Programada.',
                 },
@@ -367,6 +494,15 @@ class _DayDetail extends StatelessWidget {
               ),
             ),
           ]),
+          if (session['movedFrom'] case final String movedFrom)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(children: [
+                Icon(Icons.event_repeat, size: 16, color: scheme.tertiary),
+                const SizedBox(width: 6),
+                Expanded(child: Text('Movida desde el ${formatLongDate(movedFrom)}', key: const Key('day-moved-from'), style: Theme.of(context).textTheme.bodySmall)),
+              ]),
+            ),
           for (final (index, exercise) in (session['exercises'] as List).cast<Map<String, dynamic>>().indexed)
             ListTile(
               dense: true,
@@ -382,10 +518,33 @@ class _DayDetail extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton.icon(key: const Key('start-session'), onPressed: () => onTrain(session), icon: const Icon(Icons.play_arrow), label: const Text('Empezar sesión')),
               ),
-              Center(child: TextButton(key: Key('day-register-${session['id']}'), onPressed: () => onRegister(session), child: const Text('Ya la hice: registrarla'))),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: TextButton(key: Key('day-register-${session['id']}'), onPressed: () => onRegister(session), child: const Text('Ya la hice'))),
+                if (canMove) ...[const SizedBox(width: 8), Expanded(child: moveButton(session))],
+              ]),
             ] else
-              FilledButton.tonal(key: Key('day-register-${session['id']}'), onPressed: () => onRegister(session), child: const Text('Registrar')),
+              Row(children: [
+                Expanded(child: FilledButton.tonal(key: Key('day-register-${session['id']}'), onPressed: () => onRegister(session), child: const Text('Registrar'))),
+                if (canMove) ...[const SizedBox(width: 8), Expanded(child: moveButton(session))],
+              ]),
+          ] else if (canMove) ...[
+            const SizedBox(height: 8),
+            Align(alignment: Alignment.centerLeft, child: moveButton(session)),
           ],
+        ] else if (status == 'movida') ...[
+          Row(children: [
+            Icon(Icons.event_repeat, color: scheme.tertiary),
+            const SizedBox(width: 8),
+            Text('Sesión movida', key: const Key('moved-day'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          ]),
+          const SizedBox(height: 4),
+          Text(
+            day['movedTo'] == null ? 'Cambiaste la sesión de este día a otro día.' : 'La cambiaste al ${formatLongDate(day['movedTo'] as String)}. Este día no suma ni corta tu racha.',
+            key: const Key('moved-day-text'),
+          ),
+          if (day['movedTo'] case final String movedTo)
+            TextButton.icon(key: const Key('show-moved-day'), onPressed: () => onShowDay(movedTo), icon: const Icon(Icons.arrow_forward, size: 18), label: const Text('Ver ese día')),
         ] else if (status == 'descanso') ...[
           Row(children: [
             Icon(Icons.bedtime_outlined, color: scheme.primary),
@@ -583,14 +742,117 @@ class _Calendar extends StatelessWidget {
           ]),
         const SizedBox(height: 6),
         Wrap(spacing: 12, runSpacing: 4, children: [
-          for (final status in const ['hecho', 'descanso', 'comodin', 'perdido'])
+          for (final status in ['hecho', 'descanso', 'comodin', 'perdido', if (days.any((day) => day['status'] == 'movida')) 'movida'])
             Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(dayStatusStyle(context, status).icon, size: 14, color: scheme.onSurfaceVariant),
               const SizedBox(width: 4),
-              Text(const {'hecho': 'Realizada', 'descanso': 'Descanso', 'comodin': 'Comodín', 'perdido': 'Sin registrar'}[status]!, style: Theme.of(context).textTheme.labelSmall),
+              Text(const {'hecho': 'Realizada', 'descanso': 'Descanso', 'comodin': 'Comodín', 'perdido': 'Sin registrar', 'movida': 'Movida'}[status]!, style: Theme.of(context).textTheme.labelSmall),
             ]),
         ]),
       ],
+    );
+  }
+}
+
+/// Cambia una sesión que no se pudo (o no se podrá) hacer a otro día libre: muestra los días posibles, de hoy a una semana
+/// después, y al confirmar la mueve. Devuelve la nueva fecha y el mensaje para la persona, o null si no la movió.
+Future<({String date, String message})?> moveSession(BuildContext context, ApiClient api, String sessionId) async {
+  final chosen = await showModalBottomSheet<({String date, String name})>(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => _MoveSessionSheet(api: api, sessionId: sessionId),
+  );
+  if (chosen == null || !context.mounted) return null;
+  try {
+    await api.post('/api/sessions/$sessionId/move', {'date': chosen.date});
+    return (date: chosen.date, message: '«${chosen.name}» quedó para el ${formatLongDate(chosen.date)}.');
+  } on ApiException catch (error) {
+    if (context.mounted) showMessage(context, error.message);
+    return null;
+  }
+}
+
+class _MoveSessionSheet extends StatefulWidget {
+  const _MoveSessionSheet({required this.api, required this.sessionId});
+  final ApiClient api;
+  final String sessionId;
+
+  @override
+  State<_MoveSessionSheet> createState() => _MoveSessionSheetState();
+}
+
+class _MoveSessionSheetState extends State<_MoveSessionSheet> {
+  late final Future<Map<String, dynamic>> _options = widget.api.get('/api/sessions/${widget.sessionId}/move-options').then((value) => value as Map<String, dynamic>);
+  String? _selected;
+
+  Widget _option(BuildContext context, Map<String, dynamic> option) {
+    final scheme = Theme.of(context).colorScheme;
+    final date = option['date'] as String;
+    final selected = date == _selected;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        key: Key('move-option-$date'),
+        selected: selected,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: selected ? scheme.primary : scheme.outlineVariant)),
+        tileColor: selected ? scheme.primaryContainer.withValues(alpha: 0.5) : null,
+        leading: CircleAvatar(
+          backgroundColor: selected ? scheme.primary : scheme.surfaceContainerHighest,
+          child: Text('${dayOfMonth(date)}', style: TextStyle(fontWeight: FontWeight.w700, color: selected ? scheme.onPrimary : scheme.onSurfaceVariant)),
+        ),
+        title: Text('${option['isToday'] == true ? 'Hoy · ' : ''}${formatLongDate(date)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(option['nextToSession'] == true ? 'Queda junto a otra sesión: sin descanso entre ambas.' : 'Con descanso antes y después.'),
+        trailing: selected ? Icon(Icons.check_circle, color: scheme.primary) : null,
+        onTap: () => setState(() => _selected = date),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: _options,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
+          if (snapshot.hasError) {
+            return Padding(padding: const EdgeInsets.fromLTRB(24, 0, 24, 32), child: Text(errorText(snapshot.error!), key: const Key('move-error')));
+          }
+          final data = snapshot.data!;
+          final name = data['name'] as String;
+          final planned = (data['session'] as Map<String, dynamic>)['plannedDate'] as String;
+          final options = (data['options'] as List).cast<Map<String, dynamic>>();
+          return ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
+            child: ListView(
+              key: const Key('move-sheet'),
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+              children: [
+                Text('Cambiar de día', style: text.titleLarge),
+                const SizedBox(height: 4),
+                Text('$name · programada el ${formatLongDate(planned)}', style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                const SizedBox(height: 12),
+                Text('Elige un día libre. El día original queda como «movida»: no suma ni corta tu racha.', style: text.bodySmall),
+                const SizedBox(height: 12),
+                if (options.isEmpty)
+                  const Text('No hay días libres en la próxima semana. Si la hiciste, regístrala.', key: Key('move-no-options'))
+                else
+                  for (final option in options) _option(context, option),
+                const SizedBox(height: 8),
+                FilledButton(
+                  key: const Key('move-confirm'),
+                  onPressed: _selected == null ? null : () => Navigator.pop(context, (date: _selected!, name: name)),
+                  child: Text(_selected == null ? 'Elige un día' : 'Cambiar al ${formatLongDate(_selected!)}'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

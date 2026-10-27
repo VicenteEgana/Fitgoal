@@ -34,7 +34,7 @@ export async function exportUserData(tx, userId) {
         `SELECT pe.session_no, pe.position, e.name, pe.prescription FROM user_plan_exercises pe JOIN exercises e ON e.id = pe.exercise_id WHERE pe.plan_id = $1 ORDER BY pe.session_no, pe.position`, [row.id]))
         .map(item => ({ sessionNo: item.session_no, position: item.position, exercise: item.name, prescription: item.prescription })),
     }))),
-    sessions: (await q('SELECT label, planned_date, completed_at, note FROM training_sessions WHERE user_id = $1 ORDER BY planned_date')).map(row => ({ label: row.label, plannedDate: row.planned_date, completedAt: row.completed_at, note: row.note })),
+    sessions: (await q('SELECT label, planned_date, rescheduled_from, completed_at, note FROM training_sessions WHERE user_id = $1 ORDER BY planned_date')).map(row => ({ label: row.label, plannedDate: row.planned_date, movedFrom: row.rescheduled_from, completedAt: row.completed_at, note: row.note })),
     mealSwaps: (await q(
       `SELECT t.name AS plan, s.day_no, s.meal, o.name AS replaced, f.name AS food, s.created_at
          FROM meal_plan_swaps s JOIN meal_plan_templates t ON t.id = s.template_id JOIN foods f ON f.id = s.food_id

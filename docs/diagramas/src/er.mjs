@@ -294,7 +294,7 @@ export function erViews() {
           'audit_log.actor_id>users': { mx: 410, label: 'actor_id' },
         },
         notes: [
-          { x: 440, y: 300, w: 360, text: 'training_sessions guarda la agenda de la rutina vigente. Una sesión sin completed_at cuenta como no realizada en la adherencia (K3). La clave compuesta (plan_id, user_id) asegura que la rutina es del mismo participante.' },
+          { x: 440, y: 300, w: 360, text: 'training_sessions guarda la agenda de la rutina vigente. Una sesión sin completed_at cuenta como no realizada en la adherencia (K3). Si la persona la mueve a otro día, rescheduled_from guarda la fecha original. La clave compuesta (plan_id, user_id) asegura que la rutina es del mismo participante.' },
           { x: 440, y: 520, w: 360, text: 'audit_log es de solo anexado: la base rechaza UPDATE y DELETE. usage_events no tiene clave foránea hacia users: usa un seudónimo (HMAC-SHA256) y el vínculo con la cuenta queda separado.' },
         ],
       });

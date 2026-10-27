@@ -3,6 +3,8 @@
 // es parte del plan, así la racha nunca empuja a entrenar sin descanso. La racha empieza con una sesión registrada. Una sesión
 // vencida sin registro la corta, salvo la primera de cada semana, que cubre el comodín semanal (no suma, pero no corta).
 // La adherencia (K3) no cambia: una sesión cubierta por el comodín sigue contando como no realizada.
+// Si la persona mueve una sesión a otro día, el día original queda como «movida»: no suma ni corta, y la sesión cuenta en su
+// nueva fecha.
 import { addDays, localDate, weekStart } from './time.js';
 
 /** Hitos de la racha, en días. */
@@ -24,11 +26,12 @@ export function planCoverage(plans, timeZone) {
 /**
  * Estado de cada día entre `from` y `to`: «hecho» (sesión registrada), «descanso» (día sin sesión dentro de una rutina),
  * «pendiente» (la sesión de hoy, aún sin registrar), «programada» (sesión futura), «comodin» (primera sesión vencida sin
- * registro de la semana), «perdido» (las siguientes) o «sin_rutina».
+ * registro de la semana), «perdido» (las siguientes), «movida» (día del que se movió una sesión) o «sin_rutina».
  */
 export function dayStatuses({ sessions, plans, from, to, today }) {
   const completedOn = new Map();
   for (const session of sessions) completedOn.set(session.date, Boolean(completedOn.get(session.date)) || session.completed);
+  const movedFrom = new Set(sessions.map(session => session.movedFrom).filter(Boolean));
   const covered = date => plans.some(plan => plan.from <= date && date <= plan.to);
   const days = [];
   let week = null;
@@ -37,7 +40,7 @@ export function dayStatuses({ sessions, plans, from, to, today }) {
   for (let date = weekStart(from); date <= to; date = addDays(date, 1)) {
     if (weekStart(date) !== week) { week = weekStart(date); freezeUsed = false; }
     let status;
-    if (!completedOn.has(date)) status = covered(date) ? 'descanso' : 'sin_rutina';
+    if (!completedOn.has(date)) status = movedFrom.has(date) ? 'movida' : covered(date) ? 'descanso' : 'sin_rutina';
     else if (completedOn.get(date)) status = 'hecho';
     else if (date > today) status = 'programada';
     else if (date === today) status = 'pendiente';
@@ -69,7 +72,7 @@ export function streakSummary({ sessions, plans, today }) {
       if (status === 'perdido') lastMissedOn = date;
       current = 0;
       since = null;
-    } // «comodin» y «pendiente» no suman ni cortan; hoy, «sin_rutina» todavía no corta.
+    } // «comodin», «movida» y «pendiente» no suman ni cortan; hoy, «sin_rutina» todavía no corta.
     best = Math.max(best, current);
   }
   const todayStatus = days.at(-1).status;

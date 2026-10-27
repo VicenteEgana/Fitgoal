@@ -85,10 +85,17 @@ export async function migrate(db, dir = MIGRATIONS_DIR) {
   return run;
 }
 
-/** Tablas que crean las migraciones y que faltan en la base: pasa con una base local creada por una versión anterior del modelo. */
-export async function missingTables(db, dir = MIGRATIONS_DIR) {
+/**
+ * Tablas y columnas que crean las migraciones y que faltan en la base («tabla» o «tabla.columna»): pasa con una base local
+ * creada por una versión anterior del modelo.
+ */
+export async function missingSchema(db, dir = MIGRATIONS_DIR) {
   const expected = readdirSync(dir, { withFileTypes: true }).filter(entry => entry.isFile() && entry.name.endsWith('.sql'))
-    .flatMap(entry => [...readFileSync(join(dir, entry.name), 'utf8').matchAll(/^CREATE TABLE (\w+)/gm)].map(match => match[1]));
-  const present = new Set((await db.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")).rows.map(row => row.table_name));
-  return expected.filter(name => !present.has(name));
+    .flatMap(entry => [...readFileSync(join(dir, entry.name), 'utf8').matchAll(/^CREATE TABLE (\w+) \(\r?\n([\s\S]*?)\r?\n\);/gm)])
+    .map(([, table, body]) => ({ table, columns: [...body.matchAll(/^ {2}(?!CONSTRAINT\b)(\w+) /gm)].map(match => match[1]) }));
+  const present = new Map();
+  for (const row of (await db.query("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'")).rows) {
+    present.set(row.table_name, (present.get(row.table_name) ?? new Set()).add(row.column_name));
+  }
+  return expected.flatMap(({ table, columns }) => (present.has(table) ? columns.filter(column => !present.get(table).has(column)).map(column => `${table}.${column}`) : [table]));
 }

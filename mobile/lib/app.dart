@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api/api_client.dart';
+import 'settings.dart';
 import 'ui/admin/admin_home.dart';
 import 'ui/auth_screen.dart';
 import 'ui/participant/participant_home.dart';
@@ -8,43 +9,68 @@ import 'ui/professional/catalog_screen.dart';
 import 'ui/professional/nutrition_catalog_screen.dart';
 
 class FitGoalApp extends StatelessWidget {
-  const FitGoalApp({super.key, required this.api});
+  FitGoalApp({super.key, required this.api, ThemeController? theme}) : theme = theme ?? ThemeController();
   final ApiClient api;
+  final ThemeController theme;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FitGoal',
-      debugShowCheckedModeBanner: false,
-      theme: fitGoalTheme(),
-      home: AppRoot(api: api),
+    return AppSettings(
+      theme: theme,
+      child: ValueListenableBuilder<ThemeMode>(
+        valueListenable: theme,
+        builder: (context, mode, _) => MaterialApp(
+          title: 'FitGoal',
+          debugShowCheckedModeBanner: false,
+          theme: fitGoalTheme(Brightness.light),
+          darkTheme: fitGoalTheme(Brightness.dark),
+          themeMode: mode,
+          home: AppRoot(api: api),
+        ),
+      ),
     );
   }
 }
 
-/// Tema de la app: Material 3 con el verde azulado de FitGoal, tarjetas suaves y botones cómodos de tocar (48 px de alto).
-ThemeData fitGoalTheme() {
-  final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF0F766E));
+/// Tema de la app, claro u oscuro: Material 3 con el verde azulado de FitGoal, tarjetas suaves y botones cómodos de tocar
+/// (48 px de alto). En el modo oscuro el fondo es casi negro y las tarjetas se separan por tono, no por sombra.
+ThemeData fitGoalTheme([Brightness brightness = Brightness.light]) {
+  final dark = brightness == Brightness.dark;
+  final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF0F766E), brightness: brightness);
   final rounded = RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
-  return ThemeData(
-    colorScheme: scheme,
-    useMaterial3: true,
-    scaffoldBackgroundColor: scheme.surfaceContainerLowest,
+  final background = dark ? scheme.surface : scheme.surfaceContainerLowest;
+  final base = ThemeData(colorScheme: scheme, useMaterial3: true);
+  return base.copyWith(
+    scaffoldBackgroundColor: background,
     appBarTheme: AppBarTheme(
-      backgroundColor: scheme.surfaceContainerLowest,
+      backgroundColor: background,
       surfaceTintColor: Colors.transparent,
-      titleTextStyle: TextStyle(color: scheme.onSurface, fontSize: 20, fontWeight: FontWeight.w700),
+      scrolledUnderElevation: 0,
+      titleTextStyle: TextStyle(color: scheme.onSurface, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.2),
     ),
     cardTheme: CardThemeData(
       elevation: 0,
-      color: scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6))),
+      color: dark ? scheme.surfaceContainer : scheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: scheme.outlineVariant.withValues(alpha: dark ? 0.35 : 0.6))),
     ),
-    filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: const Size(0, 48), shape: rounded)),
-    outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48), shape: rounded)),
+    textTheme: base.textTheme.copyWith(
+      headlineMedium: base.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5),
+      titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+    ),
+    filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: const Size(0, 48), shape: rounded, textStyle: const TextStyle(fontWeight: FontWeight.w600))),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48), shape: rounded, side: BorderSide(color: scheme.outlineVariant))),
+    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(shape: rounded)),
     inputDecorationTheme: InputDecorationTheme(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
     chipTheme: const ChipThemeData(shape: StadiumBorder()),
-    navigationBarTheme: NavigationBarThemeData(backgroundColor: scheme.surfaceContainer, indicatorColor: scheme.primaryContainer),
+    listTileTheme: ListTileThemeData(iconColor: scheme.onSurfaceVariant),
+    dividerTheme: DividerThemeData(color: scheme.outlineVariant.withValues(alpha: dark ? 0.4 : 0.7)),
+    bottomSheetTheme: BottomSheetThemeData(backgroundColor: scheme.surfaceContainerLow, showDragHandle: true),
+    dialogTheme: DialogThemeData(backgroundColor: scheme.surfaceContainerHigh),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: dark ? scheme.surfaceContainerLow : scheme.surfaceContainer,
+      indicatorColor: scheme.primaryContainer,
+      labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(fontSize: 12, fontWeight: states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500)),
+    ),
     snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
   );
 }

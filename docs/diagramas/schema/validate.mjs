@@ -90,6 +90,8 @@ await expectFail('ejercicio sin aprobar en la rutina', "INSERT INTO user_plan_ex
 await expectFail('modificar la composición de una rutina iniciada', "UPDATE user_plan_exercises SET prescription = '9 series' WHERE plan_id = $1", [plan]);
 await expectOk('sesión programada de la rutina', "INSERT INTO training_sessions (user_id, plan_id, session_no, label, planned_date) VALUES ($1, $2, 1, 'Sesión 1', '2026-11-16')", [user, plan]);
 await expectFail('sesión con la rutina de otro participante', "INSERT INTO training_sessions (user_id, plan_id, session_no, label, planned_date) VALUES ($1, $2, 1, 'X', '2026-11-17')", [trainer, plan]);
+await expectOk('mover la sesión a otro día guardando la fecha original', "UPDATE training_sessions SET planned_date = '2026-11-18', rescheduled_from = '2026-11-16' WHERE plan_id = $1", [plan]);
+await expectFail('sesión movida con la fecha original igual a la nueva', "UPDATE training_sessions SET rescheduled_from = planned_date WHERE plan_id = $1", [plan]);
 
 await db.query("UPDATE user_plans SET status = 'reemplazado', replaced_at = now() WHERE id = $1", [plan]);
 passed += 1; console.log('  ✓ ok: al iniciar otra rutina la anterior queda reemplazada (solo cambian estado y fecha)');

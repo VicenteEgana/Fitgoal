@@ -37,8 +37,8 @@ Para recompilar la app web tras cambiar código Flutter: `.\iniciar.ps1 -Rebuild
 
 | Carpeta | Contenido |
 |---|---|
-| `backend/` | API Node.js/Express (monolito modular), migraciones SQL, semilla de demostración y 146 pruebas. Ver `backend/README.md`. |
-| `mobile/` | Cliente Flutter (web, Android) con 77 pruebas. Ver `mobile/README.md`. |
+| `backend/` | API Node.js/Express (monolito modular), migraciones SQL, semilla de demostración y 148 pruebas. Ver `backend/README.md`. |
+| `mobile/` | Cliente Flutter (web, Android) con 80 pruebas. Ver `mobile/README.md`. |
 | `docs/ES2_Arquitectura.md` | Capítulo de arquitectura generado: 5 procesos BPMN, casos de uso, componentes, modelo de datos, comunicaciones, infraestructura, trazabilidad. |
 | `docs/diccionario_de_datos.md` | Diccionario de datos de las 20 tablas, generado desde el mismo esquema que la migración. |
 | `docs/cambios_al_informe.md` | Qué debe cambiar el informe para coincidir con el producto. |
@@ -59,8 +59,8 @@ node schema\validate.mjs
 ## Verificación
 
 ```powershell
-cd backend; npm ci; npm test            # 146 pruebas
-cd ..\mobile; flutter analyze; flutter test   # 77 pruebas
+cd backend; npm ci; npm test            # 148 pruebas
+cd ..\mobile; flutter analyze; flutter test   # 80 pruebas
 ```
 
 Además se recorrió el flujo completo en el navegador contra la API real: perfil con estatura y peso (IMC) y consentimiento, rutina recomendada, reemplazo por una rutina propia con ejercicios sugeridos, y el catálogo del preparador con su contenido pendiente.
