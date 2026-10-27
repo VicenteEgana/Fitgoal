@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FitGoal API",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/src/server.js",
+      "cwd": "${workspaceFolder}/backend",
+      "env": { "PORT": "3000", "HOST": "127.0.0.1" },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "FitGoal Flutter en Chrome",
+      "type": "dart",
+      "request": "launch",
+      "program": "${workspaceFolder}/mobile/lib/main.dart",
+      "cwd": "${workspaceFolder}/mobile",
+      "deviceId": "chrome",
+      "toolArgs": ["--dart-define=API_BASE_URL=http://127.0.0.1:3000"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "FitGoal API y Flutter",
+      "configurations": ["FitGoal API", "FitGoal Flutter en Chrome"],
+      "stopAll": true
+    }
+  ]
+}

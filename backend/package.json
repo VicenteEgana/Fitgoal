@@ -1,0 +1,26 @@
+{
+  "name": "fitgoal-api",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "API REST de FitGoal: monolito modular Node.js/Express con PostgreSQL, autenticación por rol y catálogo aprobado por profesionales",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test \"test/**/*.test.js\"",
+    "migrate": "node src/migrate-cli.js",
+    "reset-demo": "node src/reset-demo.js"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@node-rs/argon2": "^2.2.2",
+    "express": "^5.1.0",
+    "jose": "^6.2.12",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1"
+  }
+}

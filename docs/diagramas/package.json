@@ -1,0 +1,14 @@
+{
+  "name": "fitgoal-diagramas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Generador reproducible de los diagramas de arquitectura de FitGoal (ES2)",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "playwright-core": "^1.52.0"
+  }
+}

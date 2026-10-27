@@ -1,0 +1,9 @@
+node_modules/
+backend/data/
+.env
+*.log
+qa/
+fuente_fitgoal.txt
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins-dependencies

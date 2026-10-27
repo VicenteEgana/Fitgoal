@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FitGoal · Rutinas de ejemplo</title>
+<link rel="stylesheet" href="styles.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<header class="app-header"><div class="brand">FitGoal<span>Primer incremento de desarrollo</span></div><a href="/app/" class="tag">Abrir cliente Flutter</a></header>
+<main>
+<div class="intro"><p class="eyebrow">PROYECTO DE TÍTULO</p><h1>Una rutina de ejemplo para tus días</h1><p>Completa tu perfil y genera un plan con ejercicios del catálogo de muestra.</p></div>
+<p class="demo-notice">Usa datos ficticios. Las rutinas de ejemplo muestran ejercicios y sesiones; no incluyen cargas, series ni una prescripción personal.</p>
+<div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+<div class="columns">
+<section class="surface profile"><div class="section-heading"><div><p class="eyebrow">PASO 1</p><h2>Perfil y disponibilidad</h2></div><button type="button" id="example" class="quiet">Cargar ejemplo</button></div>
+<form id="profile-form">
+<label for="name">Nombre de ejemplo</label><input id="name" name="name" maxlength="60" value="Usuario demo" required autocomplete="off">
+<div class="form-row"><div><label for="age">Edad</label><input id="age" name="age" type="number" min="18" max="120" step="1" value="25" required></div><div><label for="objective">Objetivo</label><select id="objective" name="objective"><option value="mantener">Mantener peso</option><option value="bajar">Bajar de peso</option><option value="subir">Subir de peso</option></select></div></div>
+<div class="form-row"><div><label for="level">Nivel</label><select id="level" name="level"><option value="principiante">Principiante</option><option value="intermedio">Intermedio</option></select></div><div><label for="equipment">Equipamiento</label><select id="equipment" name="equipment"><option value="sin_equipo">Sin equipo</option><option value="con_equipo">Con equipo</option></select></div></div>
+<fieldset><legend>Días disponibles</legend><div class="days"><label><input type="checkbox" name="days" value="1" checked><span>Lun</span></label><label><input type="checkbox" name="days" value="2"><span>Mar</span></label><label><input type="checkbox" name="days" value="3" checked><span>Mié</span></label><label><input type="checkbox" name="days" value="4"><span>Jue</span></label><label><input type="checkbox" name="days" value="5" checked><span>Vie</span></label><label><input type="checkbox" name="days" value="6"><span>Sáb</span></label><label><input type="checkbox" name="days" value="7"><span>Dom</span></label></div></fieldset>
+<label for="duration">Duración disponible por sesión</label><select id="duration" name="duration"><option value="30">30 minutos</option><option value="20">20 minutos</option><option value="45">45 minutos</option><option value="60">60 minutos</option></select>
+<div class="actions"><button type="submit" id="save-profile">Guardar perfil</button><span id="profile-version" class="hint">Aún sin guardar</span></div>
+</form>
+</section>
+<div class="right-column">
+<section class="surface"><div class="section-heading"><div><p class="eyebrow">PASO 2</p><h2>Genera tu plan</h2></div><button type="button" id="refresh" class="quiet">Actualizar</button></div>
+<p>El plan usa las rutinas de muestra del catálogo y las organiza en los días elegidos, según tu nivel y equipamiento.</p>
+<p id="dirty-hint" class="hint">Generar rutina de ejemplo guarda tu perfil automáticamente.</p>
+<button type="button" id="generate-plan" class="primary" disabled>Generar rutina de ejemplo</button></section>
+<section class="surface"><p class="eyebrow">TU PLAN</p><h2>Mi rutina de ejemplo</h2><div id="plan"><p>Tu rutina aparecerá aquí al generarla.</p></div></section>
+</div>
+</div>
+<footer>Flutter · API Node.js y Express · Guardado local</footer>
+</main>
+</body>
+</html>
