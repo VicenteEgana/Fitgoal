@@ -1,6 +1,6 @@
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
-import { createDatabase, migrate, missingTables } from './db.js';
+import { createDatabase, migrate, missingSchema } from './db.js';
 import { runMaintenance } from './modules/admin.js';
 import { DEMO_ACCOUNTS, DEMO_PASSWORD, seedDemo, seedDemoHistory } from './seed/demo.js';
 
@@ -8,9 +8,9 @@ const config = loadConfig();
 const db = await createDatabase({ databaseUrl: config.databaseUrl, dataDir: config.dataDir });
 const applied = await migrate(db);
 if (applied.length) console.log(`Migraciones aplicadas: ${applied.join(', ')}`);
-const missing = await missingTables(db);
+const missing = await missingSchema(db);
 if (missing.length) {
-  console.warn(`La base de datos es de una versión anterior del modelo: faltan las tablas ${missing.join(', ')}. ${config.databaseUrl ? 'Aplica la migración actualizada.' : 'Ejecuta «npm run reset-demo» dentro de backend para recrear la base local de demostración.'}`);
+  console.warn(`La base de datos es de una versión anterior del modelo: faltan ${missing.join(', ')}. ${config.databaseUrl ? 'Aplica la migración actualizada.' : 'Ejecuta «npm run reset-demo» dentro de backend para recrear la base local de demostración.'}`);
 }
 
 const demo = process.env.FITGOAL_SEED_DEMO === '1' || (!config.production && process.env.FITGOAL_SEED_DEMO !== '0' && !config.databaseUrl);

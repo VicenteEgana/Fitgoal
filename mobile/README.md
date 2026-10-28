@@ -4,7 +4,7 @@ Aplicación Flutter (web y Android) conectada a la API de `../backend`. Una sola
 
 | Rol | Pantallas | Qué hace |
 |---|---|---|
-| Participante (`user`) | Mi rutina · Rutinas · Alimentación · Perfil · Mis datos (los avisos, en la barra superior) | En «Mi rutina» ve su racha, el horario de la semana (la sesión de cada día o el descanso) y entrena en el modo sesión con temporizador de descanso. Completa el perfil (con estatura y peso opcionales y su consentimiento; la app muestra su IMC), ve las rutinas recomendadas (full body, upper/lower o push/pull/legs según su nivel y días, con las otras divisiones como alternativas), explora el catálogo filtrando por objetivo y división y la biblioteca de ejercicios, empieza una rutina al instante o arma la propia con sugerencias, elige una dieta y ve su pauta de alimentación de 7 días con los gramos ajustados a las calorías de su objetivo (si da su sexo y actividad con su consentimiento), cambia un alimento que no tiene por un equivalente aprobado, ve qué trabaja cada grupo muscular (empuje, tracción…) al tocarlo, registra sesiones y peso, ve su adherencia y ejerce sus derechos sobre datos. |
+| Participante (`user`) | Mi rutina · Rutinas · Alimentación · Perfil · Mis datos (los avisos, en la barra superior) | En «Mi rutina» ve su racha (con un botón para empezar la sesión de hoy), el horario de la semana (la sesión de cada día o el descanso), entrena en el modo sesión con temporizador de descanso y, si no puede hacer una sesión, la cambia a otro día libre. Completa el perfil (con estatura y peso opcionales y su consentimiento; la app muestra su IMC), ve las rutinas recomendadas (full body, upper/lower o push/pull/legs según su nivel y días, con las otras divisiones como alternativas), explora el catálogo filtrando por objetivo y división y la biblioteca de ejercicios, empieza una rutina al instante o arma la propia con sugerencias, elige una dieta y ve su pauta de alimentación de 7 días con los gramos ajustados a las calorías de su objetivo (si da su sexo y actividad con su consentimiento), cambia un alimento que no tiene por un equivalente aprobado, ve qué trabaja cada grupo muscular (empuje, tracción…) al tocarlo, registra sesiones y peso, ve su adherencia y ejerce sus derechos sobre datos. |
 | Preparador (`trainer`) | Catálogo (Rutinas · Ejercicios · Reglas) | Ve primero lo pendiente de aprobación, revisa una rutina y la aprueba o retira, crea ejercicios en borrador y aprueba o retira ejercicios y reglas. |
 | Nutricionista (`nutritionist`) | Pautas · Alimentos · Reglas | Revisa y aprueba o retira las pautas de 7 días (ve los alimentos sin aprobar), crea y aprueba alimentos con su composición por 100 g y aprueba las reglas nutricionales. |
 | Administración (`admin`) | Inicio | Solicitudes de derechos (resolver, rechazar, prorrogar), indicadores K1, K2, K3 y K5 con numerador y denominador, avisos. |
@@ -37,6 +37,7 @@ flutter build web --base-href=/app/ --no-web-resources-cdn --dart-define=API_BAS
 
 ## Comportamiento relevante
 
+- Tema claro, oscuro o igual que el sistema (por defecto), desde el menú de cuenta en cualquier rol. Se recuerda en el dispositivo con `shared_preferences`; no viaja al servidor.
 - Los tokens se guardan con `flutter_secure_storage`. Ante un 401 la app renueva la sesión una sola vez (varias peticiones simultáneas comparten la renovación) y reintenta; si la renovación falla, vuelve al inicio de sesión con un aviso.
 - Cada petición tiene un límite de 10 segundos y los errores de red se informan como tales; nunca se finge que algo se guardó. Cada pantalla de datos permite reintentar y «tirar para actualizar».
 - El registro exige aceptar por separado el tratamiento de la cuenta y del perfil; la estatura y el peso, los recordatorios y el seguimiento de progreso son opcionales. Se envía la versión de la política vigente.
@@ -51,7 +52,7 @@ flutter build web --base-href=/app/ --no-web-resources-cdn --dart-define=API_BAS
 
 ```powershell
 flutter analyze    # sin problemas
-flutter test       # 77 pruebas con una API simulada (test/fake_server.dart)
+flutter test       # 80 pruebas con una API simulada (test/fake_server.dart)
 ```
 
 Las pruebas simulan la API con `MockClient`; las reglas de negocio se prueban en `backend/test`. El flujo completo (perfil, recomendación, inicio, rutina propia y catálogo) también se recorrió en el navegador contra la API real. Compilar para web no comprueba Android: no hay SDK ni emulador en este equipo.

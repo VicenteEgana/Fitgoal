@@ -66,6 +66,15 @@ describe('Racha de días cumpliendo el plan (cálculo)', () => {
     assert.deepEqual(week.map(day => day.status), ['descanso', 'descanso', 'programada', 'descanso', 'programada', 'descanso', 'descanso']);
   });
 
+  test('el día del que se movió una sesión queda como «movida»: no suma ni corta la racha', () => {
+    const moved = [...done('2026-11-04', '2026-11-06'), { date: '2026-11-10', completed: true, movedFrom: '2026-11-09' }];
+    const statuses = dayStatuses({ sessions: moved, plans: PLAN, from: '2026-11-09', to: '2026-11-11', today: '2026-11-11' });
+    assert.deepEqual(statuses.map(day => day.status), ['movida', 'hecho', 'descanso']);
+    const streak = streakSummary({ sessions: moved, plans: PLAN, today: '2026-11-11' });
+    assert.equal(streak.current, 7, 'del miércoles 4 al miércoles 11 sin contar el lunes 9');
+    assert.deepEqual(streak.freeze, { available: true, usedOn: null }, 'mover una sesión no gasta el comodín');
+  });
+
   test('una rutina cubre desde el día en que se inicia hasta el final de su última semana o hasta que se reemplaza', () => {
     const rows = [
       { started_at: new Date('2026-11-02T15:00:00Z'), weeks: 4, replaced_at: new Date('2026-11-12T15:00:00Z') },
@@ -153,6 +162,57 @@ describe('Horario semanal y racha en la API (RF007, K3)', () => {
     assert.deepEqual([progress.streak.current, progress.streak.best, progress.streak.lastMissedOn], [0, 6, '2026-11-11']);
     assert.ok(progress.calendar.some(day => day.date === '2026-11-11' && day.status === 'perdido'));
     ctx.advanceDays(-10);
+  });
+
+  test('una sesión que no se pudo hacer se mueve a un día libre: el día original queda como «movida» y la adherencia la cuenta en su nueva fecha', async () => {
+    const { participant } = await participantWithPlan(ctx);
+    const [wednesday, friday] = (await participant.api.get('/api/sessions/me')).body.sessions;
+    ctx.advanceDays(3); // jueves 5: la del miércoles 4 quedó sin hacer
+    await ctx.reauth(participant);
+
+    const { options, name } = (await participant.api.get(`/api/sessions/${wednesday.id}/move-options`)).body;
+    assert.equal(name, 'Cuerpo completo B');
+    assert.deepEqual(options.map(option => option.date), ['2026-11-05', '2026-11-07', '2026-11-08', '2026-11-10'], 'de hoy a 6 días más, sin los días con sesión (viernes 6, lunes 9 y miércoles 11)');
+    assert.ok(options.every(option => option.nextToSession), 'con lunes, miércoles y viernes, cualquier día libre queda junto a otra sesión');
+    assert.equal(options[0].isToday, true);
+
+    assert.equal((await participant.api.post(`/api/sessions/${wednesday.id}/move`).send({ date: '2026-11-06' })).body.error.code, 'DAY_TAKEN');
+    assert.equal((await participant.api.post(`/api/sessions/${wednesday.id}/move`).send({ date: '2026-11-03' })).body.error.code, 'INVALID_DATE', 'nunca a un día pasado');
+    assert.equal((await participant.api.post(`/api/sessions/${wednesday.id}/move`).send({ date: '2026-11-12' })).body.error.code, 'INVALID_DATE', 'como mucho 6 días después');
+    assert.equal((await participant.api.post(`/api/sessions/${wednesday.id}/move`).send({ date: 'mañana' })).status, 400);
+
+    const moved = await participant.api.post(`/api/sessions/${wednesday.id}/move`).send({ date: '2026-11-07' });
+    assert.equal(moved.status, 200);
+    assert.deepEqual([moved.body.session.plannedDate, moved.body.session.movedFrom, moved.body.session.label], ['2026-11-07', '2026-11-04', 'Sábado · Cuerpo completo B']);
+    const week = (await participant.api.get('/api/schedule/me')).body;
+    assert.deepEqual(week.days.map(day => day.status), ['descanso', 'descanso', 'movida', 'descanso', 'programada', 'programada', 'descanso']);
+    assert.equal(week.days[2].movedTo, '2026-11-07');
+    assert.deepEqual([week.days[5].session.name, week.days[5].session.movedFrom, week.days[5].session.canMove], ['Cuerpo completo B', '2026-11-04', true]);
+    let progress = (await participant.api.get('/api/progress/me')).body;
+    assert.equal(progress.adherence, null, 'ya no hay sesiones vencidas: la movida cuenta el sábado');
+    assert.ok(progress.calendar.some(day => day.date === '2026-11-04' && day.status === 'movida'));
+
+    // Moverla de nuevo conserva la fecha original; volver a ese día la deja como una sesión normal.
+    const again = (await participant.api.post(`/api/sessions/${wednesday.id}/move`).send({ date: '2026-11-08' })).body.session;
+    assert.deepEqual([again.plannedDate, again.movedFrom], ['2026-11-08', '2026-11-04']);
+    const audit = (await ctx.db.query("SELECT detail FROM audit_log WHERE action = 'session.moved' AND entity_id = $1 ORDER BY occurred_at", [wednesday.id])).rows;
+    assert.deepEqual(audit.map(row => row.detail), [{ from: '2026-11-04', to: '2026-11-07' }, { from: '2026-11-07', to: '2026-11-08' }]);
+
+    // Una sesión registrada o de otra persona no se mueve.
+    ctx.advanceDays(1); // viernes 6
+    await ctx.reauth(participant);
+    await participant.api.post(`/api/sessions/${friday.id}/complete`).send({});
+    assert.equal((await participant.api.post(`/api/sessions/${friday.id}/move`).send({ date: '2026-11-10' })).body.error.code, 'ALREADY_COMPLETED');
+    const other = await ctx.register();
+    assert.equal((await other.api.post(`/api/sessions/${wednesday.id}/move`).send({ date: '2026-11-10' })).status, 404);
+
+    // Pasada una semana desde que venció, ya no se puede mover: solo registrar.
+    ctx.advanceDays(10); // lunes 16: la del domingo 8 quedó sin hacer hace 8 días
+    await ctx.reauth(participant);
+    assert.equal((await participant.api.get(`/api/sessions/${wednesday.id}/move-options`)).body.error.code, 'TOO_OLD');
+    progress = (await participant.api.get('/api/progress/me')).body;
+    assert.ok(progress.calendar.some(day => day.date === '2026-11-08' && ['comodin', 'perdido'].includes(day.status)), 'si no la hizo en su nueva fecha, cuenta como no realizada');
+    ctx.advanceDays(-14);
   });
 
   test('una rutina propia lleva el nombre que la persona le da a cada sesión', async () => {

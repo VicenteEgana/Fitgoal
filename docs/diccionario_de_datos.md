@@ -376,7 +376,7 @@ Reglas de integridad e índices:
 
 #### training_sessions — Sesión de entrenamiento
 
-Sesión programada al iniciar la rutina. El participante declara si la realizó; una sesión sin registro cuenta como no realizada en la adherencia. Los días de descanso no tienen filas: el horario semanal y la racha los deducen de los días de la rutina, y la racha no se guarda.
+Sesión programada al iniciar la rutina. El participante declara si la realizó; una sesión sin registro cuenta como no realizada en la adherencia. Si no puede hacerla ese día, la mueve a otro día libre. Los días de descanso no tienen filas: el horario semanal y la racha los deducen de los días de la rutina, y la racha no se guarda.
 
 | Columna | Tipo | Nulo | Clave | Por defecto | Restricción o valores | Descripción |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -385,7 +385,8 @@ Sesión programada al iniciar la rutina. El participante declara si la realizó;
 | plan_id | uuid | No | FK |  | Clave compuesta (plan_id, user_id) → user_plans(id, user_id) | Rutina del participante a la que pertenece. |
 | session_no | smallint | No |  |  | Regla: session_no BETWEEN 1 AND 7 | Número de sesión dentro de la semana del plan. |
 | label | text | No |  |  | Regla: length(label) BETWEEN 1 AND 80 | Nombre visible de la sesión. |
-| planned_date | date | No |  |  |  | Fecha programada. No se modifica retroactivamente. |
+| planned_date | date | No |  |  |  | Fecha programada. Al mover la sesión cambia a hoy o a un día futuro, nunca a una fecha pasada. |
+| rescheduled_from | date | Sí |  |  | Regla: rescheduled_from <> planned_date | Fecha programada original, si la persona movió la sesión a otro día; ese día queda como «movida» (no suma ni corta la racha). |
 | completed_at | timestamptz | Sí |  |  |  | Momento en que el participante declaró la sesión como realizada. |
 | note | text | Sí |  |  | Regla: length(note) <= 200 | Nota breve del participante. |
 | created_at | timestamptz | No |  | now() |  | Fecha y hora de creación del registro. |

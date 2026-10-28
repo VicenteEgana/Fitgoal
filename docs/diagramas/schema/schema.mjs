@@ -356,14 +356,15 @@ export const TABLES = [
   // ───────────────────────── Seguimiento, avisos y trazabilidad ─────────────────────────
   {
     name: 'training_sessions', module: 'seguimiento', es: 'Sesión de entrenamiento', informe: 'sesión',
-    desc: 'Sesión programada al iniciar la rutina. El participante declara si la realizó; una sesión sin registro cuenta como no realizada en la adherencia. Los días de descanso no tienen filas: el horario semanal y la racha los deducen de los días de la rutina, y la racha no se guarda.',
+    desc: 'Sesión programada al iniciar la rutina. El participante declara si la realizó; una sesión sin registro cuenta como no realizada en la adherencia. Si no puede hacerla ese día, la mueve a otro día libre. Los días de descanso no tienen filas: el horario semanal y la racha los deducen de los días de la rutina, y la racha no se guarda.',
     columns: [
       uuidPk('Identificador de la sesión.'),
       c('user_id', 'uuid', { desc: 'Participante.' }),
       c('plan_id', 'uuid', { desc: 'Rutina del participante a la que pertenece.' }),
       c('session_no', 'smallint', { check: 'session_no BETWEEN 1 AND 7', desc: 'Número de sesión dentro de la semana del plan.' }),
       c('label', 'text', { check: 'length(label) BETWEEN 1 AND 80', desc: 'Nombre visible de la sesión.' }),
-      c('planned_date', 'date', { desc: 'Fecha programada. No se modifica retroactivamente.' }),
+      c('planned_date', 'date', { desc: 'Fecha programada. Al mover la sesión cambia a hoy o a un día futuro, nunca a una fecha pasada.' }),
+      c('rescheduled_from', 'date', { nn: false, check: 'rescheduled_from <> planned_date', desc: 'Fecha programada original, si la persona movió la sesión a otro día; ese día queda como «movida» (no suma ni corta la racha).' }),
       ts('completed_at', 'Momento en que el participante declaró la sesión como realizada.', { nn: false }),
       c('note', 'text', { nn: false, check: 'length(note) <= 200', desc: 'Nota breve del participante.' }),
       created(),

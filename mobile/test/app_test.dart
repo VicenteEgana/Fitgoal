@@ -1,6 +1,7 @@
 import 'package:fitgoal/api/api_client.dart';
 import 'package:fitgoal/api/token_store.dart';
 import 'package:fitgoal/app.dart';
+import 'package:fitgoal/settings.dart';
 import 'package:fitgoal/ui/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -174,11 +175,11 @@ void routinesRoutes(FakeServer server, {List<Map<String, dynamic>> routines = co
   server.get('/api/exercises', {'groups': ['piernas', 'empuje', 'traccion', 'core', 'cardio', 'movilidad'], 'exercises': exercises});
 }
 
-Future<void> pumpApp(WidgetTester tester, FakeServer server, {TokenStore? tokens, Size size = const Size(420, 900)}) async {
+Future<void> pumpApp(WidgetTester tester, FakeServer server, {TokenStore? tokens, ThemeController? theme, Size size = const Size(420, 900)}) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(FitGoalApp(api: server.api(tokens: tokens)));
+  await tester.pumpWidget(FitGoalApp(api: server.api(tokens: tokens), theme: theme));
   await tester.pumpAndSettle();
 }
 
@@ -320,6 +321,37 @@ void main() {
       expect(server.calledTo('POST', '/api/auth/logout'), hasLength(1));
       expect(tokens.refresh, isNull);
       expect(find.byKey(const Key('submit')), findsOneWidget);
+    });
+
+    testWidgets('el tema se elige en el menú de cuenta (sistema, claro u oscuro) y se recuerda en el dispositivo', (tester) async {
+      final store = MemoryPreferenceStore();
+      final theme = ThemeController(store);
+      await theme.load();
+      final server = FakeServer()..on('POST', '/api/auth/login', (_, _) => session('user'));
+      planRoutes(server);
+      await pumpApp(tester, server, theme: theme);
+      await signIn(tester);
+      MaterialApp app() => tester.widget<MaterialApp>(find.byType(MaterialApp));
+      expect(app().themeMode, ThemeMode.system, reason: 'por defecto sigue el tema del sistema');
+      expect(app().darkTheme?.brightness, Brightness.dark);
+
+      await tester.tap(find.byKey(const Key('account-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('theme-dark')));
+      await tester.pumpAndSettle();
+      expect(app().themeMode, ThemeMode.dark);
+      expect(Theme.of(tester.element(find.byKey(const Key('no-plan')))).brightness, Brightness.dark, reason: 'las pantallas usan el tema oscuro');
+      expect(store.values['fitgoal.theme'], 'dark');
+
+      final restored = ThemeController(store);
+      await restored.load();
+      expect(restored.value, ThemeMode.dark, reason: 'al volver a abrir la app se usa el tema elegido');
+      await tester.tap(find.byKey(const Key('account-menu')));
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: find.byKey(const Key('theme-dark')), matching: find.byIcon(Icons.check)), findsOneWidget, reason: 'marca el tema elegido');
+      await tester.tap(find.byKey(const Key('theme-light')));
+      await tester.pumpAndSettle();
+      expect(app().themeMode, ThemeMode.light);
     });
   });
 
@@ -475,7 +507,89 @@ void main() {
       await tester.pumpAndSettle();
       expect(server.calledTo('POST', '/api/sessions/s-3/complete').single.body, <String, dynamic>{});
       expect(find.text('Sesión registrada. ¡Bien hecho!'), findsOneWidget);
-      expect(find.byKey(const Key('streak-card')), findsOneWidget, reason: 'vuelve a «Mi rutina»');
+      expect(find.byKey(const Key('week-range')), findsOneWidget, reason: 'vuelve a «Mi rutina», donde estaba');
+    });
+
+    testWidgets('si hoy toca entrenar, la tarjeta de la racha ofrece empezar la sesión sin buscarla', (tester) async {
+      await signedIn(tester, (server) => planRoutes(
+        server,
+        plan: planData(),
+        profileData: profile(),
+        progress: progressData(streak: streakData(current: 5, best: 5, today: 'pendiente')),
+        schedule: weekData(plan: true, fallback: 'descanso', days: {2: ('pendiente', sessionOfDay('s-3', 'Cuerpo completo A', canRegister: true))}),
+      ));
+      expect(find.text('Empezar: Cuerpo completo A'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('hero-start-session')));
+      await tester.pumpAndSettle();
+      expect(find.text('0/3 series'), findsOneWidget, reason: 'abre el modo sesión');
+    });
+
+    testWidgets('una sesión que no se pudo hacer se cambia a un día libre y el día original queda como «movida»', (tester) async {
+      Map<String, dynamic>? schedule = weekData(plan: true, fallback: 'descanso', previousWeek: '2026-11-02', nextWeek: '2026-11-16', days: {
+        1: ('perdido', {...sessionOfDay('s-1', 'Cuerpo completo A', canRegister: true), 'canMove': true}),
+        3: ('programada', {...sessionOfDay('s-2', 'Cuerpo completo B'), 'canMove': true}),
+      });
+      final server = await signedIn(tester, (server) {
+        planRoutes(
+          server,
+          plan: planData(),
+          profileData: profile(),
+          sessions: [{'id': 's-1', 'label': 'Lunes · Cuerpo completo A', 'plannedDate': '2026-11-09', 'completed': false, 'planStatus': 'vigente', 'canMove': true}],
+          progress: progressData(streak: streakData(current: 3, best: 3, today: 'descanso')),
+        );
+        server.on('GET', '/api/schedule/me', (_, _) => schedule);
+        server.get('/api/sessions/s-1/move-options', {
+          'session': {'id': 's-1', 'plannedDate': '2026-11-09', 'canMove': true}, 'name': 'Cuerpo completo A',
+          'options': [
+            {'date': '2026-11-10', 'dayLabel': 'Martes', 'isToday': true, 'nextToSession': true},
+            {'date': '2026-11-12', 'dayLabel': 'Jueves', 'isToday': false, 'nextToSession': true},
+            {'date': '2026-11-14', 'dayLabel': 'Sábado', 'isToday': false, 'nextToSession': false},
+          ],
+        });
+        server.on('POST', '/api/sessions/s-1/move', (_, body) {
+          // Tras moverla, el lunes queda como «movida» y la sesión aparece el sábado.
+          schedule = weekData(plan: true, fallback: 'descanso', previousWeek: '2026-11-02', nextWeek: '2026-11-16', days: {
+            1: ('movida', null),
+            3: ('programada', {...sessionOfDay('s-2', 'Cuerpo completo B'), 'canMove': true}),
+            6: ('programada', {...sessionOfDay('s-1', 'Cuerpo completo A'), 'canMove': true, 'movedFrom': '2026-11-09'}),
+          });
+          (schedule!['days'] as List)[0]['movedTo'] = '2026-11-14';
+          return {'session': {'id': 's-1', 'plannedDate': body!['date'], 'movedFrom': '2026-11-09'}};
+        });
+      });
+
+      expect(find.byKey(const Key('move-s-1')), findsOneWidget, reason: 'la lista «Sin registrar» ofrece cambiarla de día');
+      await tester.tap(find.byKey(const Key('day-cell-2026-11-11')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('day-move-s-2')), findsOneWidget, reason: 'una sesión futura también se puede cambiar de día');
+      await tester.tap(find.byKey(const Key('day-cell-2026-11-09')));
+      await tester.pumpAndSettle();
+      expect(find.text('Sin registrar. Si no pudiste hacerla, cámbiala a otro día.'), findsOneWidget);
+
+      await press(tester, find.byKey(const Key('day-move-s-1')));
+      await tester.pumpAndSettle();
+      expect(find.text('Cuerpo completo A · programada el lunes 9 nov'), findsOneWidget);
+      expect(find.text('Hoy · martes 10 nov'), findsOneWidget, reason: 'hoy aparece como opción');
+      expect(find.text('Con descanso antes y después.'), findsOneWidget);
+      expect(find.text('Queda junto a otra sesión: sin descanso entre ambas.'), findsNWidgets(2));
+      expect(tester.widget<FilledButton>(find.byKey(const Key('move-confirm'))).onPressed, isNull, reason: 'primero hay que elegir un día');
+      await tester.tap(find.byKey(const Key('move-option-2026-11-14')));
+      await tester.pumpAndSettle();
+      expect(find.text('Cambiar al sábado 14 nov'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('move-confirm')));
+      await tester.pumpAndSettle();
+      expect(server.calledTo('POST', '/api/sessions/s-1/move').single.body, {'date': '2026-11-14'});
+      expect(find.text('«Cuerpo completo A» quedó para el sábado 14 nov.'), findsOneWidget);
+
+      expect(find.text('Movida desde el lunes 9 nov'), findsOneWidget, reason: 'la semana queda a la vista en el nuevo día de la sesión');
+      expect(find.byKey(const Key('day-move-s-1')), findsOneWidget, reason: 'se puede volver a cambiar');
+      await tester.tap(find.byKey(const Key('day-cell-2026-11-09')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('moved-day')), findsOneWidget, reason: 'el lunes ahora figura como «movida»');
+      expect(find.text('La cambiaste al sábado 14 nov. Este día no suma ni corta tu racha.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('show-moved-day')));
+      await tester.pumpAndSettle();
+      expect(find.text('Movida desde el lunes 9 nov'), findsOneWidget);
     });
 
     testWidgets('la racha explica sus reglas y, tras cortarse, anima a no fallar dos veces seguidas', (tester) async {

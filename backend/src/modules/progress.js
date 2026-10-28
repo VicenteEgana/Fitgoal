@@ -1,17 +1,38 @@
-// Seguimiento: horario semanal con días de descanso, registro de sesión realizada, peso con consentimiento, adherencia, racha
-// y avisos internos.
+// Seguimiento: horario semanal con días de descanso, registro de sesión realizada, cambio de una sesión a otro día, peso con
+// consentimiento, adherencia, racha y avisos internos.
 import { Router } from 'express';
 import { fail } from '../lib/errors.js';
-import { hasConsent, usageEvent } from '../lib/records.js';
+import { audit, hasConsent, usageEvent } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
 import { DAY_LABELS, addDays, isoWeekday, localDate, weekStart } from '../lib/time.js';
 import { isIsoDate, uuidParam } from '../lib/validate.js';
 import { dayStatuses, planCoverage, streakSummary } from '../lib/streak.js';
 
 const iso = value => (value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10));
-const sessionView = row => ({ id: row.id, planId: row.plan_id, sessionNo: row.session_no, label: row.label, plannedDate: iso(row.planned_date), completed: Boolean(row.completed_at), completedAt: row.completed_at, note: row.note, planStatus: row.plan_status });
+const isoOrNull = value => (value ? iso(value) : null);
 /** Semanas que muestra el calendario de progreso: las 4 anteriores y la actual. */
 const CALENDAR_WEEKS = 5;
+/** Una sesión sin registrar se puede mover hasta 7 días después de vencida… */
+const MOVE_MISSED_DAYS = 7;
+/** …a hoy o a un día libre de los 6 siguientes a su fecha (o a hoy, si ya venció). */
+const MOVE_AHEAD_DAYS = 6;
+
+/**
+ * Días entre los que se puede mover una sesión, o el motivo por el que no se puede: tiene que ser de la rutina vigente, estar sin
+ * registrar y no haber vencido hace más de una semana. Nunca se mueve a una fecha pasada.
+ */
+function moveWindow(row, today) {
+  const date = iso(row.planned_date);
+  if (row.plan_status !== 'vigente') return { error: [409, 'PLAN_REPLACED', 'Esa sesión pertenece a un plan que ya fue reemplazado.'] };
+  if (row.completed_at) return { error: [409, 'ALREADY_COMPLETED', 'Esa sesión ya está registrada como realizada.'] };
+  if (date < addDays(today, -MOVE_MISSED_DAYS)) return { error: [409, 'TOO_OLD', `Solo puedes mover sesiones de los últimos ${MOVE_MISSED_DAYS} días. Si la hiciste, regístrala.`] };
+  return { from: today, to: addDays(date > today ? date : today, MOVE_AHEAD_DAYS) };
+}
+
+const sessionView = (row, today) => ({
+  id: row.id, planId: row.plan_id, sessionNo: row.session_no, label: row.label, plannedDate: iso(row.planned_date), movedFrom: isoOrNull(row.rescheduled_from),
+  completed: Boolean(row.completed_at), completedAt: row.completed_at, note: row.note, planStatus: row.plan_status, canMove: !moveWindow(row, today).error,
+});
 
 export function progressRouter(ctx) {
   const { db, config, now } = ctx;
@@ -19,12 +40,26 @@ export function progressRouter(ctx) {
   const participant = requireRole('user');
   const today = () => localDate(now(), config.timezone);
 
-  /** Rutinas del participante (para saber qué días son de descanso) y sus sesiones hasta una fecha. */
+  const toStatusInput = row => ({ date: iso(row.planned_date), completed: Boolean(row.completed_at), movedFrom: isoOrNull(row.rescheduled_from) });
+
+  /**
+   * Rutinas del participante (para saber qué días son de descanso) y sus sesiones hasta una fecha, más las que se movieron
+   * desde un día anterior a esa fecha (para marcar ese día como «movida»).
+   */
   async function history(tx, userId, until) {
     const plans = (await tx.query('SELECT id, name, weeks, days, session_labels, session_minutes, status, started_at, replaced_at FROM user_plans WHERE user_id = $1 ORDER BY started_at', [userId])).rows;
-    const sessions = (await tx.query('SELECT planned_date, completed_at FROM training_sessions WHERE user_id = $1 AND planned_date <= $2', [userId, until])).rows
-      .map(row => ({ date: iso(row.planned_date), completed: Boolean(row.completed_at) }));
+    const sessions = (await tx.query('SELECT planned_date, completed_at, rescheduled_from FROM training_sessions WHERE user_id = $1 AND (planned_date <= $2 OR rescheduled_from <= $2)', [userId, until])).rows
+      .map(toStatusInput);
     return { plans, coverage: planCoverage(plans, config.timezone), sessions };
+  }
+
+  /** Sesión del participante con el estado de su rutina; `lock` la bloquea para modificarla. */
+  async function ownSession(tx, id, userId, lock = false) {
+    const session = (await tx.query(
+      `SELECT s.*, p.status AS plan_status, p.session_labels FROM training_sessions s JOIN user_plans p ON p.id = s.plan_id
+        WHERE s.id = $1 AND s.user_id = $2${lock ? ' FOR UPDATE OF s' : ''}`, [id, userId])).rows[0];
+    if (!session) fail(404, 'NOT_FOUND', 'La sesión indicada no existe.');
+    return session;
   }
 
   /**
@@ -39,16 +74,20 @@ export function progressRouter(ctx) {
     const sessions = (await db.query(
       `SELECT s.*, p.status AS plan_status, p.session_minutes, p.session_labels FROM training_sessions s JOIN user_plans p ON p.id = s.plan_id
         WHERE s.user_id = $1 AND s.planned_date BETWEEN $2 AND $3 ORDER BY s.planned_date, s.completed_at NULLS LAST`, [req.auth.userId, start, end])).rows;
+    // Sesiones que se movieron desde un día de esta semana (pueden haber quedado en la siguiente).
+    const movedAway = (await db.query('SELECT planned_date, completed_at, rescheduled_from FROM training_sessions WHERE user_id = $1 AND rescheduled_from BETWEEN $2 AND $3', [req.auth.userId, start, end])).rows;
     const planIds = [...new Set(sessions.map(row => row.plan_id))];
     const exercises = planIds.length ? (await db.query(
       `SELECT pe.plan_id, pe.session_no, pe.prescription, e.code, e.name, e.description, e.muscle_group, e.requires_equipment
          FROM user_plan_exercises pe JOIN exercises e ON e.id = pe.exercise_id WHERE pe.plan_id = ANY($1) ORDER BY pe.session_no, pe.position`, [planIds])).rows : [];
-    const statuses = dayStatuses({ sessions: sessions.map(row => ({ date: iso(row.planned_date), completed: Boolean(row.completed_at) })), plans: coverage, from: start, to: end, today: current });
+    const statuses = dayStatuses({ sessions: [...sessions, ...movedAway].map(toStatusInput), plans: coverage, from: start, to: end, today: current });
     const rest = (await db.query("SELECT code, name, description, default_prescription FROM exercises WHERE status = 'approved' AND muscle_group = 'movilidad' ORDER BY name LIMIT 6")).rows;
     const vigente = plans.find(plan => plan.status === 'vigente');
     const vigenteCoverage = vigente ? coverage[plans.indexOf(vigente)] : null;
+    const lastSession = isoOrNull((await db.query('SELECT max(planned_date) AS last FROM training_sessions WHERE user_id = $1', [req.auth.userId])).rows[0].last);
     const firstDay = coverage.length ? coverage.reduce((min, item) => (item.from < min ? item.from : min), coverage[0].from) : null;
-    const lastDay = coverage.length ? coverage.reduce((max, item) => (item.to > max ? item.to : max), coverage[0].to) : null;
+    // Una sesión movida puede quedar después del final de la rutina: también se puede navegar hasta su semana.
+    const lastDay = coverage.length ? [...coverage.map(item => item.to), lastSession].filter(Boolean).reduce((max, date) => (date > max ? date : max)) : null;
     res.json({
       today: current, weekStart: start, weekEnd: end,
       previousWeek: firstDay && firstDay < start ? addDays(start, -7) : null,
@@ -57,12 +96,16 @@ export function progressRouter(ctx) {
       days: statuses.map(({ date, status }) => {
         const row = sessions.find(item => iso(item.planned_date) === date);
         const items = row ? exercises.filter(item => item.plan_id === row.plan_id && item.session_no === row.session_no) : [];
+        const movedTo = status === 'movida' ? iso(movedAway.find(item => iso(item.rescheduled_from) === date).planned_date) : null;
         return {
           date, weekday: isoWeekday(date), dayLabel: DAY_LABELS[isoWeekday(date) - 1], isToday: date === current, status,
+          movedTo,
           session: row ? {
             id: row.id, sessionNo: row.session_no, name: row.session_labels[row.session_no - 1] ?? row.label, label: row.label, minutes: row.session_minutes,
             completed: Boolean(row.completed_at), completedAt: row.completed_at, note: row.note, planStatus: row.plan_status,
+            movedFrom: isoOrNull(row.rescheduled_from),
             canRegister: row.plan_status === 'vigente' && !row.completed_at && date <= current,
+            canMove: !moveWindow(row, current).error,
             groups: [...new Set(items.map(item => item.muscle_group))],
             exercises: items.map(item => ({ code: item.code, name: item.name, description: item.description, muscleGroup: item.muscle_group, requiresEquipment: item.requires_equipment, prescription: item.prescription })),
           } : null,
@@ -86,7 +129,52 @@ export function progressRouter(ctx) {
     const rows = (await db.query(
       `SELECT s.*, p.status AS plan_status FROM training_sessions s JOIN user_plans p ON p.id = s.plan_id
         WHERE s.user_id = $1 AND s.planned_date BETWEEN $2 AND $3 ORDER BY s.planned_date`, [req.auth.userId, from, to])).rows;
-    res.json({ today: today(), sessions: rows.map(sessionView) });
+    res.json({ today: today(), sessions: rows.map(row => sessionView(row, today())) });
+  });
+
+  /** Días libres a los que se puede mover una sesión; `nextToSession` avisa si queda pegada a otra sesión (sin descanso entre ambas). */
+  router.get('/sessions/:id/move-options', participant, async (req, res) => {
+    const current = today();
+    const session = await ownSession(db, uuidParam(req.params.id, 'sesión'), req.auth.userId);
+    const window = moveWindow(session, current);
+    if (window.error) fail(...window.error);
+    const taken = new Set((await db.query('SELECT planned_date FROM training_sessions WHERE plan_id = $1 AND id <> $2 AND planned_date BETWEEN $3 AND $4',
+      [session.plan_id, session.id, addDays(window.from, -1), addDays(window.to, 1)])).rows.map(row => iso(row.planned_date)));
+    const options = [];
+    for (let date = window.from; date <= window.to; date = addDays(date, 1)) {
+      if (taken.has(date) || date === iso(session.planned_date)) continue;
+      options.push({ date, dayLabel: DAY_LABELS[isoWeekday(date) - 1], isToday: date === current, nextToSession: taken.has(addDays(date, -1)) || taken.has(addDays(date, 1)) });
+    }
+    res.json({ session: sessionView(session, current), name: session.session_labels[session.session_no - 1] ?? session.label, options });
+  });
+
+  /**
+   * Mueve una sesión que no se pudo hacer (o que no se podrá) a otro día libre. Se guarda la fecha original: ese día queda como
+   * «movida» en el horario y la racha, y la sesión cuenta en su nueva fecha.
+   */
+  router.post('/sessions/:id/move', participant, async (req, res) => {
+    const id = uuidParam(req.params.id, 'sesión');
+    const date = req.body?.date;
+    if (!isIsoDate(date)) fail(400, 'INVALID_DATE', 'Indica el nuevo día de la sesión (AAAA-MM-DD).');
+    const result = await db.transaction(async tx => {
+      const current = today();
+      const session = await ownSession(tx, id, req.auth.userId, true);
+      const window = moveWindow(session, current);
+      if (window.error) fail(...window.error);
+      const planned = iso(session.planned_date);
+      if (date === planned) fail(400, 'SAME_DATE', 'La sesión ya está programada ese día.');
+      if (date < window.from || date > window.to) fail(400, 'INVALID_DATE', `Puedes moverla a hoy o hasta ${MOVE_AHEAD_DAYS} días después de su fecha, nunca a un día pasado.`);
+      if ((await tx.query('SELECT 1 FROM training_sessions WHERE plan_id = $1 AND planned_date = $2', [session.plan_id, date])).rows.length) {
+        fail(409, 'DAY_TAKEN', 'Ese día ya tienes otra sesión. Elige un día libre.');
+      }
+      const original = isoOrNull(session.rescheduled_from) ?? planned;
+      const name = session.session_labels[session.session_no - 1] ?? session.label;
+      await tx.query('UPDATE training_sessions SET planned_date = $2, rescheduled_from = $3, label = $4 WHERE id = $1',
+        [id, date, original === date ? null : original, `${DAY_LABELS[isoWeekday(date) - 1]} · ${name}`.slice(0, 80)]);
+      await audit(tx, now(), { actor: req.auth, action: 'session.moved', entityType: 'session', entityId: id, detail: { from: planned, to: date } });
+      return sessionView(await ownSession(tx, id, req.auth.userId), current);
+    });
+    res.json({ session: result });
   });
 
   router.post('/sessions/:id/complete', participant, async (req, res) => {
@@ -114,7 +202,7 @@ export function progressRouter(ctx) {
         }
       }
       const updated = (await tx.query('SELECT s.*, p.status AS plan_status FROM training_sessions s JOIN user_plans p ON p.id = s.plan_id WHERE s.id = $1', [id])).rows[0];
-      return { session: sessionView(updated), weightRejected };
+      return { session: sessionView(updated, today()), weightRejected };
     });
     res.json(result);
   });
@@ -149,7 +237,8 @@ export function progressRouter(ctx) {
     const calendarFrom = addDays(weekStart(current), -7 * (CALENDAR_WEEKS - 1));
     const calendarTo = addDays(weekStart(current), 6);
     const { coverage, sessions } = await history(db, req.auth.userId, calendarTo);
-    const streak = streakSummary({ sessions: sessions.filter(item => item.date <= current), plans: coverage, today: current });
+    // La racha se calcula hasta hoy; las sesiones futuras se pasan igual porque una pudo moverse desde un día ya vencido.
+    const streak = streakSummary({ sessions, plans: coverage, today: current });
     const calendar = dayStatuses({ sessions, plans: coverage, from: calendarFrom, to: calendarTo, today: current });
     const rows = (await db.query('SELECT planned_date, completed_at FROM training_sessions WHERE user_id = $1 AND planned_date <= $2 ORDER BY planned_date', [req.auth.userId, current])).rows;
     const weeks = new Map();

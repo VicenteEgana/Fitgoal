@@ -617,7 +617,7 @@ COMMENT ON COLUMN meal_plan_swaps.position IS 'Posición del alimento reemplazad
 COMMENT ON COLUMN meal_plan_swaps.food_id IS 'Alimento que lo reemplaza: aprobado, del mismo grupo y presente en la misma pauta.';
 COMMENT ON COLUMN meal_plan_swaps.created_at IS 'Fecha y hora de creación del registro.';
 
--- training_sessions: Sesión programada al iniciar la rutina. El participante declara si la realizó; una sesión sin registro cuenta como no realizada en la adherencia. Los días de descanso no tienen filas: el horario semanal y la racha los deducen de los días de la rutina, y la racha no se guarda.
+-- training_sessions: Sesión programada al iniciar la rutina. El participante declara si la realizó; una sesión sin registro cuenta como no realizada en la adherencia. Si no puede hacerla ese día, la mueve a otro día libre. Los días de descanso no tienen filas: el horario semanal y la racha los deducen de los días de la rutina, y la racha no se guarda.
 CREATE TABLE training_sessions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -625,6 +625,7 @@ CREATE TABLE training_sessions (
   session_no smallint NOT NULL,
   label text NOT NULL,
   planned_date date NOT NULL,
+  rescheduled_from date,
   completed_at timestamptz,
   note text,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -632,17 +633,19 @@ CREATE TABLE training_sessions (
   CONSTRAINT training_sessions_plan_date_key UNIQUE (plan_id, planned_date),
   CONSTRAINT training_sessions_session_no_range CHECK (session_no BETWEEN 1 AND 7),
   CONSTRAINT training_sessions_label_range CHECK (length(label) BETWEEN 1 AND 80),
+  CONSTRAINT training_sessions_rescheduled_from_range CHECK (rescheduled_from <> planned_date),
   CONSTRAINT training_sessions_note_range CHECK (length(note) <= 200),
   CONSTRAINT training_sessions_plan_id_user_id_fkey FOREIGN KEY (plan_id, user_id) REFERENCES user_plans (id, user_id)
 );
 CREATE INDEX training_sessions_user_date ON training_sessions (user_id, planned_date);
-COMMENT ON TABLE training_sessions IS 'Sesión programada al iniciar la rutina. El participante declara si la realizó; una sesión sin registro cuenta como no realizada en la adherencia. Los días de descanso no tienen filas: el horario semanal y la racha los deducen de los días de la rutina, y la racha no se guarda.';
+COMMENT ON TABLE training_sessions IS 'Sesión programada al iniciar la rutina. El participante declara si la realizó; una sesión sin registro cuenta como no realizada en la adherencia. Si no puede hacerla ese día, la mueve a otro día libre. Los días de descanso no tienen filas: el horario semanal y la racha los deducen de los días de la rutina, y la racha no se guarda.';
 COMMENT ON COLUMN training_sessions.id IS 'Identificador de la sesión.';
 COMMENT ON COLUMN training_sessions.user_id IS 'Participante.';
 COMMENT ON COLUMN training_sessions.plan_id IS 'Rutina del participante a la que pertenece.';
 COMMENT ON COLUMN training_sessions.session_no IS 'Número de sesión dentro de la semana del plan.';
 COMMENT ON COLUMN training_sessions.label IS 'Nombre visible de la sesión.';
-COMMENT ON COLUMN training_sessions.planned_date IS 'Fecha programada. No se modifica retroactivamente.';
+COMMENT ON COLUMN training_sessions.planned_date IS 'Fecha programada. Al mover la sesión cambia a hoy o a un día futuro, nunca a una fecha pasada.';
+COMMENT ON COLUMN training_sessions.rescheduled_from IS 'Fecha programada original, si la persona movió la sesión a otro día; ese día queda como «movida» (no suma ni corta la racha).';
 COMMENT ON COLUMN training_sessions.completed_at IS 'Momento en que el participante declaró la sesión como realizada.';
 COMMENT ON COLUMN training_sessions.note IS 'Nota breve del participante.';
 COMMENT ON COLUMN training_sessions.created_at IS 'Fecha y hora de creación del registro.';

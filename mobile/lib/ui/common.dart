@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
+import '../settings.dart';
 
 const objectiveLabels = {
   'bajar': 'Bajar de peso',
@@ -203,6 +204,7 @@ List<String> recoveryWarnings(Map<int, Set<String>> groupsByDay) {
     'programada' => (icon: Icons.fitness_center, background: scheme.secondaryContainer, foreground: scheme.onSecondaryContainer, label: 'Sesión programada'),
     'comodin' => (icon: Icons.ac_unit, background: scheme.tertiaryContainer, foreground: scheme.onTertiaryContainer, label: 'Sin registrar: la cubrió el comodín'),
     'perdido' => (icon: Icons.close, background: scheme.errorContainer, foreground: scheme.onErrorContainer, label: 'Sin registrar'),
+    'movida' => (icon: Icons.event_repeat, background: scheme.surfaceContainerHighest, foreground: scheme.tertiary, label: 'Sesión movida a otro día'),
     _ => (icon: Icons.remove, background: Colors.transparent, foreground: scheme.outline, label: 'Sin rutina'),
   };
 }
@@ -377,9 +379,12 @@ void showMessage(BuildContext context, String text) {
 
 /// Carga datos de la API con reintento y «tirar para actualizar».
 class Loader<T> extends StatefulWidget {
-  const Loader({super.key, required this.load, required this.builder});
+  const Loader({super.key, required this.load, required this.builder, this.keepPrevious = false});
   final Future<T> Function() load;
   final Widget Function(BuildContext context, T data, Future<void> Function() reload) builder;
+  /// Al recargar, sigue mostrando los datos anteriores con una barra de progreso arriba, en vez de vaciar la pantalla:
+  /// la persona no pierde dónde estaba (por ejemplo, tras registrar una sesión al final de la lista).
+  final bool keepPrevious;
 
   @override
   State<Loader<T>> createState() => _LoaderState<T>();
@@ -405,7 +410,16 @@ class _LoaderState<T> extends State<Loader<T>> {
     return FutureBuilder<T>(
       future: _future,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        final waiting = snapshot.connectionState != ConnectionState.done;
+        // Al cambiar de futuro, FutureBuilder conserva los datos del anterior mientras espera.
+        if (widget.keepPrevious && snapshot.hasData && (waiting || !snapshot.hasError)) {
+          // La misma estructura con y sin la barra, para que la lista conserve su posición al terminar de recargar.
+          return Stack(children: [
+            RefreshIndicator(onRefresh: _reload, child: widget.builder(context, snapshot.data as T, _reload)),
+            if (waiting) const Positioned(top: 0, left: 0, right: 0, child: LinearProgressIndicator(key: Key('reloading'), minHeight: 2)),
+          ]);
+        }
+        if (waiting) {
           return const Center(child: CircularProgressIndicator(key: Key('loading')));
         }
         if (snapshot.hasError) {
@@ -518,7 +532,7 @@ Future<String?> askText(
   );
 }
 
-/// Menú de cuenta: cambio de contraseña y cierre de sesión.
+/// Menú de cuenta: tema de la app (sistema, claro u oscuro), cambio de contraseña y cierre de sesión.
 class AccountMenu extends StatelessWidget {
   const AccountMenu({super.key, required this.api, required this.onLogout});
   final ApiClient api;
@@ -556,18 +570,36 @@ class AccountMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = AppSettings.maybeOf(context);
     return PopupMenuButton<String>(
       key: const Key('account-menu'),
       icon: const Icon(Icons.account_circle_outlined),
-      tooltip: api.user?.email ?? 'Cuenta',
+      tooltip: 'Cuenta y tema',
       onSelected: (value) {
         if (value == 'password') _changePassword(context);
         if (value == 'logout') onLogout();
+        if (value.startsWith('theme:')) theme?.choose(ThemeMode.values.byName(value.substring(6)));
       },
       itemBuilder: (context) => [
-        PopupMenuItem(enabled: false, child: Text(api.user?.email ?? '')),
-        const PopupMenuItem(value: 'password', child: Text('Cambiar contraseña')),
-        const PopupMenuItem(value: 'logout', child: Text('Cerrar sesión')),
+        PopupMenuItem(enabled: false, child: Text(api.user?.email ?? '', style: Theme.of(context).textTheme.labelMedium)),
+        if (theme != null) ...[
+          const PopupMenuDivider(),
+          PopupMenuItem(enabled: false, height: 32, child: Text('Tema', style: Theme.of(context).textTheme.labelSmall)),
+          for (final mode in ThemeMode.values)
+            PopupMenuItem(
+              key: Key('theme-${mode.name}'),
+              value: 'theme:${mode.name}',
+              child: Row(children: [
+                Icon(themeModeIcons[mode], size: 20),
+                const SizedBox(width: 12),
+                Expanded(child: Text(themeModeLabels[mode]!)),
+                if (theme.value == mode) Icon(Icons.check, size: 18, color: Theme.of(context).colorScheme.primary),
+              ]),
+            ),
+          const PopupMenuDivider(),
+        ],
+        const PopupMenuItem(value: 'password', child: Row(children: [Icon(Icons.lock_outline, size: 20), SizedBox(width: 12), Expanded(child: Text('Cambiar contraseña'))])),
+        const PopupMenuItem(value: 'logout', child: Row(children: [Icon(Icons.logout, size: 20), SizedBox(width: 12), Expanded(child: Text('Cerrar sesión'))])),
       ],
     );
   }

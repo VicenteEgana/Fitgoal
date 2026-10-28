@@ -73,7 +73,7 @@ Todas las rutas cuelgan de `/api`. Los errores siguen `{ "error": { "code", "mes
 | Perfil | `GET/PUT /profiles/me`, `GET /profiles/me/versions`, `GET/POST /consents` | user |
 | Recomendación | `GET /routines`, `GET /routines/:id`, `GET /exercises`, `GET /exercises/suggestions` | user |
 | Rutina | `POST /plans/start`, `GET /plans/me`, `GET /plans/me/history` | user |
-| Seguimiento | `GET /schedule/me?date=` (semana de lunes a domingo), `GET /sessions/me`, `POST /sessions/:id/complete`, `GET/POST /weights/me`, `GET /progress/me` (adherencia, racha y calendario) | user |
+| Seguimiento | `GET /schedule/me?date=` (semana de lunes a domingo), `GET /sessions/me`, `POST /sessions/:id/complete`, `GET /sessions/:id/move-options` y `POST /sessions/:id/move` (cambiar una sesión a otro día libre), `GET/POST /weights/me`, `GET /progress/me` (adherencia, racha y calendario) | user |
 | Avisos | `GET /notifications/me`, `POST /notifications/:id/read`, `POST /notifications/read-all` | todos los roles |
 | Alimentación | `GET /meal-plans`, `GET /meal-plans/:id`, `GET /meal-plans/:id/alternatives?dayNo=&meal=&position=` (alimentos equivalentes), `PUT /meal-plans/:id/swaps` (cambiar un alimento, en una comida o en toda la semana; el alimento original lo deshace), `DELETE /meal-plans/:id/swaps` (volver a la pauta original) | user |
 | Estimación | `GET /estimates/energy` | user (ficticio) |
@@ -81,19 +81,19 @@ Todas las rutas cuelgan de `/api`. Los errores siguen `{ "error": { "code", "mes
 | Catálogo | `GET /catalog/exercises`, `/templates`, `/templates/:id`, `/rules`; `POST` de creación; `.../approve` y `.../retire` | lectura: trainer, nutritionist, admin · ejercicios y rutinas: trainer · reglas: trainer, nutritionist |
 | Administración | `GET/POST/PATCH /admin/users`, `GET /admin/audit`, `GET /admin/kpis`, `GET /admin/data-requests`, `POST /admin/data-requests/:id/resolve`, `POST /admin/maintenance/run` | admin |
 
-La persona nunca ve contenido en borrador: `GET /routines` y `GET /exercises` devuelven solo lo aprobado y vigente. Lo mismo con `GET /meal-plans`: solo pautas aprobadas por la nutricionista, con los gramos ajustados a las calorías del objetivo cuando la persona dio sus datos y consentimientos (`src/lib/energy.js` y `src/lib/meal-plans.js`). Si a la persona le falta un alimento, lo cambia por otro aprobado del mismo grupo que esa pauta incluye, con los gramos que aportan la misma energía; el cambio se guarda en `meal_plan_swaps` y un disparador de la base impide reemplazos de otro grupo. Si al iniciar la API la base local es de una versión anterior del modelo (faltan tablas), el servidor lo avisa: ejecuta `npm run reset-demo`. `node src/seed/export-meal-plans.js` escribe las pautas completas en `docs/pautas_de_alimentacion.md`.
+La persona nunca ve contenido en borrador: `GET /routines` y `GET /exercises` devuelven solo lo aprobado y vigente. Lo mismo con `GET /meal-plans`: solo pautas aprobadas por la nutricionista, con los gramos ajustados a las calorías del objetivo cuando la persona dio sus datos y consentimientos (`src/lib/energy.js` y `src/lib/meal-plans.js`). Si a la persona le falta un alimento, lo cambia por otro aprobado del mismo grupo que esa pauta incluye, con los gramos que aportan la misma energía; el cambio se guarda en `meal_plan_swaps` y un disparador de la base impide reemplazos de otro grupo. Si la persona no puede hacer una sesión, la cambia a otro día libre: desde hoy hasta 6 días después de su fecha (o de hoy, si ya venció), solo si no está registrada y venció hace 7 días o menos; nunca a un día pasado. `training_sessions.rescheduled_from` guarda la fecha original: ese día queda como «movida» en el horario y la racha (no suma ni corta) y la sesión cuenta en su nueva fecha para la adherencia. Si al iniciar la API la base local es de una versión anterior del modelo (faltan tablas o columnas), el servidor lo avisa: ejecuta `npm run reset-demo`. `node src/seed/export-meal-plans.js` escribe las pautas completas en `docs/pautas_de_alimentacion.md`.
 
 ## Base de datos
 
-`migrations/001_modelo_mvp.sql` se genera desde `../docs/diagramas/schema/schema.mjs` (20 tablas). No se edita a mano: cambia el esquema, ejecuta `node generate.mjs` en `docs/diagramas` y `node schema/validate.mjs` (77 comprobaciones sobre PostgreSQL 18.3). `archivo/` conserva, solo como referencia, el primer incremento (demo sin cuentas) y la versión anterior del flujo con revisión por caso (borradores, revisiones y asignaciones), que ya no forma parte de la API.
+`migrations/001_modelo_mvp.sql` se genera desde `../docs/diagramas/schema/schema.mjs` (20 tablas). No se edita a mano: cambia el esquema, ejecuta `node generate.mjs` en `docs/diagramas` y `node schema/validate.mjs` (79 comprobaciones sobre PostgreSQL 18.3). `archivo/` conserva, solo como referencia, el primer incremento (demo sin cuentas) y la versión anterior del flujo con revisión por caso (borradores, revisiones y asignaciones), que ya no forma parte de la API.
 
 ## Pruebas
 
 ```powershell
-npm test      # 146 pruebas, usan una base PGlite en memoria y un reloj inyectable
+npm test      # 148 pruebas, usan una base PGlite en memoria y un reloj inyectable
 ```
 
-Cubren identidad (consentimientos, rotación y reutilización de refresh, límites), perfil versionado, estatura, peso e IMC con consentimiento, catálogo (borrador, aprobación, retiro, versiones y reglas con referencias válidas), recomendaciones (IMC y división de la semana) y biblioteca, calorías por objetivo y pautas de alimentación, cambio de alimentos por equivalentes, catálogo nutricional, inicio de rutinas (recomendada y propia, límites seguros, reemplazo, inmutabilidad), seguimiento y adherencia, derechos sobre datos (plazos, prórroga, eliminación), administración e indicadores, y una prueba de humo del servidor.
+Cubren identidad (consentimientos, rotación y reutilización de refresh, límites), perfil versionado, estatura, peso e IMC con consentimiento, catálogo (borrador, aprobación, retiro, versiones y reglas con referencias válidas), recomendaciones (IMC y división de la semana) y biblioteca, calorías por objetivo y pautas de alimentación, cambio de alimentos por equivalentes, catálogo nutricional, inicio de rutinas (recomendada y propia, límites seguros, reemplazo, inmutabilidad), seguimiento, adherencia y cambio de una sesión a otro día, derechos sobre datos (plazos, prórroga, eliminación), administración e indicadores, y una prueba de humo del servidor.
 
 ## Alcance pendiente
 

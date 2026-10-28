@@ -7,11 +7,15 @@ import '../notifications_view.dart';
 const feminineStatus = {'draft': 'Borrador', 'approved': 'Aprobada', 'retired': 'Retirada'};
 const masculineStatus = {'draft': 'Borrador', 'approved': 'Aprobado', 'retired': 'Retirado'};
 
-Color statusColor(BuildContext context, String status) => switch (status) {
-  'approved' => Colors.green.shade700,
-  'draft' => Colors.orange.shade800,
-  _ => Theme.of(context).disabledColor,
-};
+/// Color del estado de un elemento del catálogo; en el modo oscuro, tonos más claros para que se lean sobre el fondo.
+Color statusColor(BuildContext context, String status) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  return switch (status) {
+    'approved' => dark ? Colors.green.shade300 : Colors.green.shade700,
+    'draft' => dark ? Colors.orange.shade300 : Colors.orange.shade800,
+    _ => Theme.of(context).disabledColor,
+  };
+}
 
 /// Catálogo del preparador físico: aprueba una sola vez las rutinas, los ejercicios y las reglas que reciben todas las personas (RF005).
 class CatalogScreen extends StatelessWidget {
