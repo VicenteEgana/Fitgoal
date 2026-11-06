@@ -1,11 +1,11 @@
-// Genera el SQL de migración y el documento docs/ES2_Arquitectura.md a partir del esquema y del contenido.
-// Uso: node generate.mjs
-import { mkdirSync, writeFileSync } from 'node:fs';
+// Genera el SQL de migración, el diccionario de datos, docs/ES2_Arquitectura.md y las figuras numeradas de docs/entrega_es2.
+// Uso: node generate.mjs (después de node build.mjs, que produce los PNG)
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { TABLES, MODULES, TRIGGERS } from './schema/schema.mjs';
+import { TABLES, MODULES, TRIGGERS, DATA_CLASSES, DATA_PROTECTION } from './schema/schema.mjs';
 import { fullMigration } from './schema/sql.mjs';
 import { relations } from './src/er.mjs';
-import { PROCESSES, USE_CASE_SPECS, COMPONENTS, TRACE } from './content.mjs';
+import { PROCESSES, USE_CASE_SPECS, COMPONENTS, TRACE, MAIN_PROCESSES, PROCESS_CHOICE, SELECTION } from './content.mjs';
 import { USE_CASES } from './src/usecases.mjs';
 import { PROTOCOLS, ENVIRONMENTS } from './src/network.mjs';
 
@@ -14,6 +14,7 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const esc = text => String(text).replaceAll('|', '\\|').replaceAll('\n', ' ');
 const table = (headers, rows) => [`| ${headers.join(' | ')} |`, `| ${headers.map(() => '---').join(' | ')} |`, ...rows.map(row => `| ${row.map(esc).join(' | ')} |`)].join('\n');
 const img = (file, alt) => `![${alt}](diagramas/out/png/${file}.png)`;
+const figureName = (item, i) => `${String(i + 1).padStart(2, '0')}-${item.file}.png`;
 
 // 1 · Migración SQL ----------------------------------------------------------------
 mkdirSync(`${root}backend/migrations`, { recursive: true });
@@ -36,11 +37,55 @@ const keyOf = (t, col) => {
   if (col.uq) keys.push('UQ');
   return keys.join(' ');
 };
+const pkOf = t => t.columns.filter(col => col.pk).map(col => col.name).join(', ');
+const moduleName = id => MODULES.find(m => m.id === id).name;
+const ON_DELETE = {
+  CASCADE: 'CASCADE: borra también las filas hijas',
+  'SET NULL': 'SET NULL: deja vacía la referencia',
+};
+const onDeleteText = action => ON_DELETE[action] ?? 'NO ACTION: impide borrar el padre mientras tenga filas hijas';
+const cardinality = r => `${r.optional ? '0..1' : '1'} : ${r.unique ? '0..1' : '0..N'}`;
+const triggerTiming = tr => {
+  const timing = tr.sql.match(/CREATE TRIGGER \w+ (BEFORE|AFTER) (.+?) ON /s);
+  const fn = tr.sql.match(/EXECUTE FUNCTION (\w+)\(/);
+  return { when: timing ? `${timing[1]} ${timing[2].replace(/\s+/g, ' ').trim()}` : '', fn: fn ? `${fn[1]}()` : '' };
+};
+
+const TYPE_NOTES = [
+  ['uuid', 'Identificador de 128 bits. Las claves primarias se generan con gen_random_uuid().'],
+  ['text', 'Texto UTF-8 sin largo fijo; los largos máximos se fijan con reglas (CHECK).'],
+  ['smallint · integer · bigint', 'Enteros de 2, 4 y 8 bytes. «bigint (identidad)» es un correlativo que genera la base de datos.'],
+  ['numeric(p,s)', 'Decimal exacto con p dígitos en total y s decimales, por ejemplo numeric(5,1) para el peso en kilogramos.'],
+  ['boolean', 'Verdadero o falso.'],
+  ['date', 'Fecha calendario, sin hora.'],
+  ['timestamptz', 'Fecha y hora con zona horaria; PostgreSQL la guarda en UTC.'],
+  ['jsonb', 'Documento JSON en formato binario, con reglas de forma (por ejemplo, que sea un objeto).'],
+  ['text[] · smallint[]', 'Arreglos de texto o de enteros, por ejemplo los días de la semana o los nombres de las sesiones.'],
+];
+
+const rels = relations();
+const allRels = relations({ includeSelf: true });
+const counts = {
+  tables: TABLES.length,
+  columns: TABLES.reduce((n, t) => n + t.columns.length, 0),
+  fks: allRels.length,
+  checks: TABLES.reduce((n, t) => n + (t.checks ?? []).length + t.columns.filter(col => col.check || col.values).length, 0),
+  uniques: TABLES.reduce((n, t) => n + (t.unique ?? []).length + t.columns.filter(col => col.uq).length, 0),
+  indexes: TABLES.reduce((n, t) => n + (t.indexes ?? []).length, 0),
+  triggers: TRIGGERS.length,
+};
+
+function tableSummary() {
+  return table(['N.º', 'Tabla', 'Entidad', 'Módulo', 'Columnas', 'Clave primaria', 'Clasificación del dato'],
+    TABLES.map((t, i) => [String(i + 1), t.name, t.es, moduleName(t.module), String(t.columns.length), pkOf(t), DATA_PROTECTION[t.name].cls]));
+}
+
 function dictionary() {
   const out = [];
   for (const module of MODULES) {
     out.push(`### ${module.name}\n`);
     for (const t of TABLES.filter(item => item.module === module.id)) {
+      const data = DATA_PROTECTION[t.name];
       out.push(`#### ${t.name} — ${t.es}\n`);
       out.push(`${t.desc}\n`);
       out.push(table(['Columna', 'Tipo', 'Nulo', 'Clave', 'Por defecto', 'Restricción o valores', 'Descripción'],
@@ -50,18 +95,80 @@ function dictionary() {
         ...(t.fks ?? []).map(fk => `**Clave foránea compuesta** (${fk.cols.join(', ')}) → ${fk.ref}(${fk.refCols.join(', ')}): ${fk.desc}`),
         ...(t.checks ?? []).map(chk => `**${t.name}_${chk.name}**: ${chk.desc}`),
         ...(t.indexes ?? []).map(ix => `**Índice ${ix.name}**: ${ix.desc}`),
+        ...TRIGGERS.filter(tr => tr.table === t.name).map(tr => `**Disparador ${tr.name}**: ${tr.desc}`),
       ];
       if (rules.length) out.push(`\nReglas de integridad e índices:\n\n${rules.map(rule => `- ${rule}`).join('\n')}`);
+      out.push(`\nProtección de datos:\n\n- **Clasificación:** ${data.cls}. ${data.detail}\n- **Al eliminar la cuenta:** ${data.erase}`);
       out.push('');
     }
   }
   return out.join('\n');
 }
-const dictFile = `# Diccionario de datos de FitGoal\n\nGenerado desde \`docs/diagramas/schema/schema.mjs\`. Coincide con \`backend/migrations/001_modelo_mvp.sql\`, que se aplicó y se probó en PostgreSQL 18.\n\n${dictionary()}`;
+
+const dictFile = `# Diccionario de datos de FitGoal
+
+Generado desde \`docs/diagramas/schema/schema.mjs\`. Coincide con \`backend/migrations/001_modelo_mvp.sql\`, que se aplicó y se probó en PostgreSQL 18 (\`node schema/validate.mjs\`).
+
+El modelo tiene ${counts.tables} tablas en ${MODULES.length} módulos, con ${counts.columns} columnas, ${counts.fks} claves foráneas, ${counts.checks} reglas de validación (CHECK), ${counts.uniques} restricciones de unicidad, ${counts.indexes} índices y ${counts.triggers} disparadores. Todas las reglas las aplica PostgreSQL, no solo la API.
+
+## 1. Cómo leer este diccionario
+
+- Los nombres de tablas y columnas están en inglés (snake_case), como en el código; las descripciones, en español.
+- **Nulo:** «No» significa que la columna es obligatoria (NOT NULL).
+- **Clave:** PK es la clave primaria; FK, una clave foránea; UQ, un valor único.
+- **Restricción o valores:** «Valores» enumera los valores permitidos; «Regla» es una condición CHECK; «Referencia» indica la tabla y columna a la que apunta la clave foránea y qué ocurre al borrar el registro padre.
+- **Protección de datos:** la clasificación de cada tabla y lo que ocurre con sus filas cuando se aplica la eliminación de una cuenta (derecho de supresión).
+
+### Tipos de datos
+
+${table(['Tipo', 'Uso en el modelo'], TYPE_NOTES)}
+
+### Clasificación de los datos
+
+${table(['Clasificación', 'Qué incluye'], DATA_CLASSES)}
+
+Los respaldos cifrados se conservan 7 días (copias diarias) y 4 semanas (copias semanales). Las solicitudes de eliminación quedan registradas en \`data_requests\` para reaplicarlas si se restaura una copia anterior.
+
+## 2. Resumen de tablas
+
+${tableSummary()}
+
+## 3. Detalle por tabla
+
+${dictionary()}
+
+## 4. Relaciones
+
+La cardinalidad se lee padre : hija. Por ejemplo, «1 : 0..N» indica que cada fila hija apunta a una fila padre y que un padre puede tener cero o más hijas; «0..1» en el lado del padre indica que la referencia es opcional.
+
+${table(['N.º', 'Tabla hija', 'Columnas', 'Tabla padre', 'Columnas', 'Cardinalidad', 'Al borrar el padre'],
+  allRels.map((r, i) => [String(i + 1), r.child, r.cols.join(', '), r.parent, r.parentCols.join(', '), cardinality(r), onDeleteText(r.onDelete)]))}
+
+## 5. Disparadores y funciones
+
+${table(['Disparador', 'Tabla', 'Momento', 'Función', 'Finalidad'], TRIGGERS.map(tr => { const { when, fn } = triggerTiming(tr); return [tr.name, tr.table, when, fn, tr.desc]; }))}
+`;
 writeFileSync(`${root}docs/diccionario_de_datos.md`, dictFile, 'utf8');
 
-// 3 · Documento de arquitectura ---------------------------------------------------
-const rels = relations();
+// 3 · Figuras numeradas para el informe -------------------------------------------
+const figuresDir = `${root}docs/entrega_es2`;
+mkdirSync(figuresDir, { recursive: true });
+for (const name of readdirSync(figuresDir)) if (name.endsWith('.png')) rmSync(`${figuresDir}/${name}`);
+const missing = [];
+SELECTION.forEach((item, i) => {
+  const source = `${here}out/png/${item.file}.png`;
+  if (existsSync(source)) copyFileSync(source, `${figuresDir}/${figureName(item, i)}`);
+  else missing.push(item.file);
+});
+if (missing.length) console.warn(`Faltan PNG (ejecuta node build.mjs): ${missing.join(', ')}`);
+writeFileSync(`${figuresDir}/indice.md`, `# Figuras seleccionadas para el informe (ES2)
+
+Copias numeradas de \`docs/diagramas/out/png\`, en el orden del capítulo de arquitectura. Se regeneran con \`node build.mjs\` y \`node generate.mjs\` desde \`docs/diagramas\`; no se editan a mano. El diccionario de datos completo está en \`docs/diccionario_de_datos.md\`.
+
+${table(['Figura', 'Capa', 'Diagrama', 'Archivo'], SELECTION.map((item, i) => [String(i + 1), item.layer, item.caption, figureName(item, i)]))}
+`, 'utf8');
+
+// 4 · Documento de arquitectura ---------------------------------------------------
 const entityMap = [
   ['Usuario', 'users', 'Cuenta con rol: participante, preparador físico, nutricionista o administrador.'],
   ['Perfil', 'profile_versions', 'Cada cambio crea una versión; la rutina del participante referencia la versión usada.'],
@@ -71,19 +178,56 @@ const entityMap = [
   ['Minuta (pauta de alimentación)', 'meal_plan_templates, meal_plan_items, foods, meal_plan_swaps', 'Pauta de 7 días por tipo de dieta, aprobada una sola vez por la nutricionista con alimentos aprobados; la API ajusta los gramos a las calorías de cada persona, que puede cambiar un alimento que no tiene por otro aprobado del mismo grupo de esa pauta.'],
   ['Rutina del participante (plan vigente)', 'user_plans, user_plan_exercises', 'Copia inmutable de una rutina aprobada, o rutina propia con ejercicios aprobados; una sola vigente por persona.'],
   ['Aprobación profesional', 'exercises, routine_templates, foods, meal_plan_templates, rule_versions (status, approved_by, approved_by_role)', 'La base exige que quien aprueba tenga el rol competente; solo lo aprobado se ofrece a las personas.'],
-  ['Sesión', 'training_sessions (entrenamiento), auth_sessions (acceso)', 'Sesión programada y declarada; la sesión de autenticación se guarda aparte.'],
+  ['Sesión', 'training_sessions (entrenamiento), auth_sessions (acceso)', 'Sesión programada, declarada o cambiada de día; la sesión de autenticación se guarda aparte.'],
   ['Consentimiento', 'consents', 'Registro anexado con la versión de la política.'],
   ['Auditoría', 'audit_log', 'Bitácora de solo anexado.'],
 ];
 
+const processSection = p => `### ${p.id} · ${p.name}
+
+${img(p.file, p.name)}
+
+${img(p.sub, `${p.id} subprocesos`)}
+
+${table(['Elemento', 'Descripción'], [
+  ['Objetivo', p.objective], ['Disparador', p.trigger], ['Actores', p.actors], ['Resultado', p.result],
+  ['Requerimientos', p.rf], ['Indicadores', p.kpis],
+])}
+
+**Flujo.**
+
+${p.flow.map((step, i) => `${i + 1}. ${step}`).join('\n')}
+
+**Subprocesos.**
+
+${table(['Subproceso', 'Qué hace', 'Trazabilidad'], p.subs)}
+
+**Optimización.** ${p.optimization}
+`;
+const mainProcesses = PROCESSES.filter(p => MAIN_PROCESSES.includes(p.id));
+const annexProcesses = PROCESSES.filter(p => !MAIN_PROCESSES.includes(p.id));
+
 const sections = [];
 sections.push(`# FitGoal · Arquitectura de la solución (borrador del capítulo para ES2)
 
-Este documento reúne el diseño técnico de FitGoal que exige la Evaluación Sumativa 2: procesos de negocio en BPMN, casos de uso y componentes en UML, modelo y diccionario de datos, topología de comunicaciones, infraestructura y arquitectura integrada. Se redactó tomando como especificación el informe de formulación del 01-10-2026 (\`FitGoal_Formulacion_Proyecto_Corregida.docx\`) y se genera con código, de modo que los diagramas, el esquema SQL y el diccionario sean coherentes entre sí.
+Este documento reúne el diseño técnico de FitGoal que exige la Evaluación Sumativa 2, ordenado por capas: procesos de negocio en BPMN; capa lógica (casos de uso y componentes en UML); capa de datos (modelo y diccionario de datos), y capa física y de red (topología de comunicaciones, infraestructura y arquitectura TI integral). Se redactó tomando como especificación el informe de formulación del 01-10-2026 (\`FitGoal_Formulacion_Proyecto_Corregida.docx\`) y se genera con código, de modo que los diagramas, el esquema SQL y el diccionario sean coherentes entre sí.
 
-**Estado de implementación.** Estos diagramas describen el MVP y coinciden con el código del repositorio. El modelo de datos está implementado y verificado como migración SQL (20 tablas, con sus reglas de integridad probadas en PostgreSQL 18), la API Node.js/Express y la app Flutter están construidas según este diseño y tienen pruebas automáticas. Las pautas de alimentación usan contenido de demostración que la nutricionista del proyecto debe revisar y aprobar antes del piloto. Quedan fuera del alcance actual el despliegue en Render y las pruebas de carga.
+**Estado de implementación.** Estos diagramas describen el MVP y coinciden con el código del repositorio. El modelo de datos está implementado y verificado como migración SQL (${TABLES.length} tablas, con sus reglas de integridad probadas en PostgreSQL 18), la API Node.js/Express y la app Flutter están construidas según este diseño y tienen pruebas automáticas. Las pautas de alimentación usan contenido de demostración que la nutricionista del proyecto debe revisar y aprobar antes del piloto. Quedan fuera del alcance actual el despliegue en Render, la integración continua en GitHub Actions y las pruebas de carga: hoy la app, la API y la base de datos corren y se prueban en las estaciones de desarrollo.
 
-**Cómo regenerar.** Desde \`docs/diagramas\`: \`node build.mjs\` (diagramas) y \`node generate.mjs\` (SQL y documentos). \`node schema/validate.mjs\` aplica el esquema en PostgreSQL y prueba sus reglas.
+**Cómo regenerar.** Desde \`docs/diagramas\`: \`node build.mjs\` (diagramas) y \`node generate.mjs\` (SQL, documentos y figuras numeradas en \`docs/entrega_es2\`). \`node schema/validate.mjs\` aplica el esquema en PostgreSQL y prueba sus reglas.
+`);
+
+sections.push(`## Diagramas seleccionados para el informe
+
+Las figuras van en este orden y están copiadas con su número en \`docs/entrega_es2\`, listas para insertarlas en el informe.
+
+${table(['Figura', 'Capa', 'Diagrama', 'Archivo'], SELECTION.map((item, i) => [String(i + 1), item.layer, item.caption, `entrega_es2/${figureName(item, i)}`]))}
+
+**Los tres procesos BPMN del cuerpo del informe.** Se modelaron cinco procesos; en el cuerpo van los tres que sostienen el servicio, y cada uno con sus subprocesos:
+
+${table(['Proceso', 'Por qué es de los más importantes'], PROCESS_CHOICE)}
+
+P2 (inicio de la rutina) y P4 (derechos sobre los datos) quedan en el Anexo A. P2 continúa directamente a P1, y su garantía principal (lo que se inicia ya está aprobado) la explica P5. P4 responde a una obligación legal y puede citarse junto a la normativa en la sección de calidad. Los diagramas de estados y de secuencia complementan la capa lógica y quedan en el Anexo B.
 `);
 
 sections.push(`## 1. Contexto del sistema
@@ -95,49 +239,28 @@ FitGoal es usado por cuatro roles: el participante, el preparador físico, la nu
 
 sections.push(`## 2. Procesos de negocio (BPMN)
 
-Se modelaron cinco procesos principales con BPMN 2.0. Los tres primeros forman el ciclo de valor de FitGoal para la persona: incorporarla y recomendarle rutinas aprobadas (P1), dejarla empezar de inmediato una rutina recomendada o propia (P2) y acompañar su seguimiento (P3). El cuarto (P4) responde a una obligación legal y ética propia de trabajar con datos asociados a salud: atender los derechos del titular sobre sus datos. El quinto (P5) es el control de calidad del servicio: el profesional aprueba una sola vez, con versión y trazabilidad, todo lo que reciben las personas. Cada proceso tiene un diagrama de nivel 1, con carriles por actor, y otro con sus subprocesos expandidos. Las tareas azules son automáticas y representan la optimización del proceso: lo que el sistema resuelve sin intervención humana.
+Los procesos se modelaron con BPMN 2.0. Cada uno tiene un diagrama de nivel 1, con carriles por actor, y otro con sus subprocesos expandidos. Las tareas azules son automáticas y representan la optimización del proceso: lo que el sistema resuelve sin intervención humana.
 
-Los procesos se conectan así: P5 prepara el catálogo aprobado que usan P1 y P2; P1 termina con la lista de rutinas para elegir; P2 inicia la rutina vigente que alimenta P3; un cambio de perfil en P3 vuelve a P1 para ver nuevas recomendaciones; y P4 puede iniciarse en cualquier momento del ciclo. No existe revisión caso a caso: la persona recibe al instante lo que ya está aprobado.
+Los tres procesos principales forman un ciclo: P5 prepara el catálogo aprobado; P1 incorpora a la persona y le recomienda rutinas de ese catálogo; la persona inicia su rutina (P2, en el anexo) y P3 acompaña su seguimiento semana a semana; un cambio de perfil en P3 vuelve a P1 para ver nuevas recomendaciones. No existe revisión caso a caso: la persona recibe al instante lo que ya está aprobado.
 `);
-for (const p of PROCESSES) {
-  sections.push(`### ${p.id} · ${p.name}
+for (const p of mainProcesses) sections.push(processSection(p));
 
-${img(p.file, p.name)}
+sections.push(`## 3. Capa lógica
 
-${img(p.sub, `${p.id} subprocesos`)}
-
-${table(['Elemento', 'Descripción'], [
-    ['Objetivo', p.objective], ['Disparador', p.trigger], ['Actores', p.actors], ['Resultado', p.result],
-    ['Requerimientos', p.rf], ['Indicadores', p.kpis],
-  ])}
-
-**Flujo.**
-
-${p.flow.map((step, i) => `${i + 1}. ${step}`).join('\n')}
-
-**Subprocesos.**
-
-${table(['Subproceso', 'Qué hace', 'Trazabilidad'], p.subs)}
-
-**Optimización.** ${p.optimization}
-`);
-}
-
-sections.push(`## 3. Casos de uso (UML)
+### 3.1 Casos de uso (UML)
 
 ${img('cu-1-participante', 'Casos de uso del participante')}
 
 ${img('cu-2-profesionales-y-administracion', 'Casos de uso de profesionales y administración')}
 
-Los 31 casos de uso cubren los diez requerimientos funcionales. CU-02 (autenticación) es previo a todos los casos protegidos. CU-17 a CU-20 son funciones del sistema incluidas por otros casos; CU-12 extiende a CU-10 y CU-23 extiende a CU-21 y CU-22. Cada caso se relaciona con el problema del informe: personas que no saben estructurar un plan coherente (CU-03 a CU-09, con rutinas recomendadas y ayuda para armar la propia), la necesidad de validación profesional sin frenar el uso (CU-21 a CU-24: el profesional aprueba el catálogo una sola vez), el seguimiento que sostiene la continuidad (CU-10 a CU-13) y el cuidado de datos de salud (CU-12, CU-14, CU-20, CU-27).
+Los ${USE_CASES.length} casos de uso cubren los diez requerimientos funcionales. CU-02 (autenticación) es previo a todos los casos protegidos. CU-17 a CU-20 son funciones del sistema incluidas por otros casos; CU-32 extiende a CU-07, CU-12 extiende a CU-10 y CU-23 extiende a CU-21 y CU-22. CU-32 se agregó después de numerar los demás, por eso queda al final. Cada caso se relaciona con el problema del informe: personas que no saben estructurar un plan coherente (CU-03 a CU-09, con rutinas recomendadas y ayuda para armar la propia), la necesidad de validación profesional sin frenar el uso (CU-21 a CU-24: el profesional aprueba el catálogo una sola vez), el seguimiento que sostiene la continuidad (CU-10 a CU-13 y CU-32) y el cuidado de datos de salud (CU-12, CU-14, CU-20, CU-27).
 
-### Especificación de los casos de uso
+#### Especificación de los casos de uso
 
 ${table(['Caso de uso', 'Actor', 'Requerimientos', 'Precondición', 'Flujo principal', 'Flujos alternativos', 'Postcondición'],
   USE_CASES.map(uc => { const s = USE_CASE_SPECS[uc.id]; return [`**${uc.id}** ${uc.name}`, uc.actor, uc.rf.join(', '), s.pre, s.flow.map((step, i) => `${i + 1}) ${step}`).join(' '), s.alt, s.post]; }))}
-`);
 
-sections.push(`## 4. Diagrama de componentes
+### 3.2 Diagrama de componentes
 
 ${img('ar-1-componentes', 'Diagrama de componentes')}
 
@@ -146,11 +269,13 @@ El backend es un monolito modular: cada módulo es un componente lógico con res
 ${table(['Componente', 'Tipo', 'Responsabilidad', 'Depende de', 'Rutas o puertos'], COMPONENTS)}
 `);
 
-sections.push(`## 5. Modelo de datos
+sections.push(`## 4. Capa de datos
+
+### 4.1 Modelo de datos
 
 ${img('er-0-general', 'Vista general del modelo de datos')}
 
-El modelo relacional tiene 20 tablas en cuatro módulos y se implementa en PostgreSQL 18, elegido por las relaciones entre usuarios, perfiles, catálogo aprobado y rutinas, y por la necesidad de integridad referencial y transacciones. La base de datos aplica por sí misma las reglas que el informe declara como requisitos: solo el preparador aprueba ejercicios, rutinas y reglas de entrenamiento y solo la nutricionista los alimentos, las pautas de alimentación y las reglas nutricionales, una rutina solo puede iniciarse desde una plantilla aprobada y solo con ejercicios aprobados, una pauta solo se aprueba con alimentos aprobados, un alimento de la pauta solo se cambia por otro aprobado del mismo grupo que esa pauta incluye, una rutina iniciada y una pauta aprobada no se modifican, la bitácora es de solo anexado, el sexo y la actividad del cálculo de calorías exigen la estatura y el peso, y hay una única rutina vigente por participante.
+El modelo relacional tiene ${TABLES.length} tablas en cuatro módulos y se implementa en PostgreSQL 18, elegido por las relaciones entre usuarios, perfiles, catálogo aprobado y rutinas, y por la necesidad de integridad referencial y transacciones. La base de datos aplica por sí misma las reglas que el informe declara como requisitos: solo el preparador aprueba ejercicios, rutinas y reglas de entrenamiento y solo la nutricionista los alimentos, las pautas de alimentación y las reglas nutricionales, una rutina solo puede iniciarse desde una plantilla aprobada y solo con ejercicios aprobados, una pauta solo se aprueba con alimentos aprobados, un alimento de la pauta solo se cambia por otro aprobado del mismo grupo que esa pauta incluye, una rutina iniciada y una pauta aprobada no se modifican, la bitácora es de solo anexado, el sexo y la actividad del cálculo de calorías exigen la estatura y el peso, y hay una única rutina vigente por participante.
 
 ${img('er-1-identidad', 'ER 1')}
 
@@ -162,26 +287,70 @@ ${img('er-3-planes', 'ER 3')}
 
 ${img('er-4-seguimiento', 'ER 4')}
 
-### Correspondencia con las entidades del informe
+#### Correspondencia con las entidades del informe
 
 ${table(['Entidad del informe', 'Tabla', 'Observación'], entityMap)}
 
-### Relaciones
+#### Relaciones
 
-${table(['Tabla hija', 'Columnas', 'Tabla padre', 'Columnas', 'Cardinalidad'], rels.map(r => [r.child, r.cols.join(', '), r.parent, r.parentCols.join(', '), `${r.optional ? '0..1' : '1'} : ${r.unique ? '0..1' : '0..N'}`]))}
+${table(['Tabla hija', 'Columnas', 'Tabla padre', 'Columnas', 'Cardinalidad'], rels.map(r => [r.child, r.cols.join(', '), r.parent, r.parentCols.join(', '), cardinality(r)]))}
 
-### Disparadores y funciones
+#### Disparadores y funciones
 
 ${table(['Nombre', 'Tabla', 'Finalidad'], TRIGGERS.map(tr => [tr.name, tr.table, tr.desc]))}
 
-### Verificación del modelo
+#### Verificación del modelo
 
 El script \`docs/diagramas/schema/validate.mjs\` aplica la migración en un PostgreSQL real (PGlite 0.5.8, que ejecuta PostgreSQL 18.3) y ejecuta 79 comprobaciones de integridad: contraseña con Argon2id, correo único sin distinguir mayúsculas, perfil adulto, días válidos, estatura y peso juntos y en rangos humanos, sexo y actividad solo con estatura y peso, competencia del aprobador de ejercicios, rutinas, alimentos, pautas y reglas, plantillas aprobadas inmutables, división válida y sesiones con nombre, solo plantillas y ejercicios aprobados en una rutina, rutina iniciada inmutable (con los nombres de sus sesiones), una sola rutina vigente, sesión movida con su fecha original distinta de la nueva, composición plausible de los alimentos, pautas solo con alimentos aprobados e inmutables una vez aprobadas, cambios de alimento solo por otro aprobado del mismo grupo que la pauta incluye, bitácora de solo anexado y formato del seudónimo.
 
-El diccionario de datos completo, con cada columna, tipo, restricción y descripción, está en \`docs/diccionario_de_datos.md\`.
+### 4.2 Diccionario de datos
+
+El diccionario completo está en \`docs/diccionario_de_datos.md\` y se genera desde el mismo esquema que la migración SQL. Por cada tabla documenta todas sus columnas (tipo, obligatoriedad, clave, valor por defecto, restricciones y descripción), sus reglas de integridad, índices y disparadores, la clasificación de sus datos y lo que ocurre con ellos al eliminar una cuenta. Incluye además las ${allRels.length} relaciones con su cardinalidad y acción al borrar, y los ${TRIGGERS.length} disparadores con su momento de ejecución. En total: ${counts.columns} columnas, ${counts.checks} reglas de validación, ${counts.uniques} restricciones de unicidad y ${counts.indexes} índices.
+
+${tableSummary()}
+
+${table(['Clasificación', 'Qué incluye'], DATA_CLASSES)}
 `);
 
-sections.push(`## 6. Comportamiento
+sections.push(`## 5. Capa física y de red
+
+### 5.1 Topología de comunicaciones
+
+${img('ar-2-topologia', 'Topología de comunicaciones')}
+
+Todo el tráfico del usuario entra por HTTPS (puerto 443) al borde gestionado de Render, que termina TLS 1.2 o superior; la API y la base de datos se comunican por la red privada del proveedor y la base exige TLS. El tramo entre el borde y el servicio ocurre dentro de la red del proveedor, y se solicitará evidencia de su protección antes del piloto.
+
+${table(['N.º', 'Enlace', 'Protocolo y puerto', 'Seguridad', 'Características de transmisión'], PROTOCOLS)}
+
+### 5.2 Infraestructura
+
+${img('ar-3-infraestructura', 'Diagrama de infraestructura')}
+
+${table(['Ambiente', 'Dónde corre', 'Datos', 'Secretos y accesos', 'Uso y condición'], ENVIRONMENTS)}
+
+Hoy la app, la API y PostgreSQL en proceso (PGlite) corren y se prueban en las estaciones de desarrollo; Render, el respaldo externo, el sondeo, GitHub Actions, las pruebas de carga con k6 y la distribución por Google Play corresponden al piloto. Las cifras de CPU, memoria y almacenamiento corresponden a las tarifas públicas consultadas el 1 de octubre de 2026 y a las condiciones del presupuesto del informe; deben confirmarse al contratar. La región es Virginia, en Estados Unidos, por tener la menor latencia desde Chile (\`docs/evidencia_es2/latencia_regiones.txt\`); Render no permite cambiarla en un servicio ya creado.
+
+### 5.3 Arquitectura TI integral
+
+${img('ar-4-arquitectura-integrada', 'Arquitectura de la solución')}
+
+La vista integrada une las capas de software (presentación, servicios y datos) con el hardware y los servicios que las soportan, y muestra los aspectos transversales de seguridad y ética, calidad y operación que atraviesan todas las capas.
+`);
+
+sections.push(`## 6. Matriz de trazabilidad
+
+${table(['Requerimiento', 'Nombre', 'Casos de uso', 'Módulos', 'Tablas', 'Proceso BPMN', 'KPI', 'Prueba'], TRACE)}
+
+La columna «Prueba» remite a las evidencias propuestas en el Anexo 2 del informe. Esta matriz extiende la trazabilidad del informe (requisito → KPI → prueba) hacia el diseño: requisito → caso de uso → módulo → tabla → proceso.
+`);
+
+sections.push(`## Anexo A. Procesos complementarios
+
+Estos procesos están modelados con el mismo detalle que los del cuerpo del informe. P2 continúa a P1 y alimenta a P3; P4 puede iniciarse en cualquier momento del ciclo.
+`);
+for (const p of annexProcesses) sections.push(processSection(p));
+
+sections.push(`## Anexo B. Comportamiento
 
 ${img('st-1-estados', 'Estados del catálogo y de la rutina')}
 
@@ -190,38 +359,7 @@ ${img('sq-1-secuencia', 'Secuencia del flujo crítico')}
 El diagrama de estados define dos ciclos de vida. El contenido del catálogo (ejercicios, rutinas y reglas) nace «draft», pasa a «approved» cuando lo aprueba el profesional competente y termina «retired» cuando se retira o se aprueba una versión nueva. La rutina del participante solo está «vigente» o «reemplazada». La secuencia muestra el flujo crítico completo: la aprobación previa del catálogo, el perfil y la recomendación, el inicio inmediato de la rutina y su consulta, con las transacciones que garantizan la consistencia entre aprobación, inicio de la rutina y auditoría.
 `);
 
-sections.push(`## 7. Topología de comunicaciones
-
-${img('ar-2-topologia', 'Topología de comunicaciones')}
-
-Todo el tráfico del usuario entra por HTTPS (puerto 443) al borde gestionado de Render, que termina TLS 1.2 o superior; la API y la base de datos se comunican por la red privada del proveedor y la base exige TLS. El tramo entre el borde y el servicio ocurre dentro de la red del proveedor, y se solicitará evidencia de su protección antes del piloto.
-
-${table(['N.º', 'Enlace', 'Protocolo y puerto', 'Seguridad', 'Características de transmisión'], PROTOCOLS)}
-`);
-
-sections.push(`## 8. Infraestructura
-
-${img('ar-3-infraestructura', 'Diagrama de infraestructura')}
-
-${table(['Ambiente', 'Dónde corre', 'Datos', 'Secretos y accesos', 'Uso y condición'], ENVIRONMENTS)}
-
-Las cifras de CPU, memoria y almacenamiento corresponden a las tarifas públicas consultadas el 1 de octubre de 2026 y a las condiciones del presupuesto del informe; deben confirmarse al contratar. La región se definirá al abrir la cuenta, considerando la latencia desde Chile.
-`);
-
-sections.push(`## 9. Arquitectura de la solución
-
-${img('ar-4-arquitectura-integrada', 'Arquitectura de la solución')}
-
-La vista integrada une las capas de software (presentación, servicios y datos) con el hardware y los servicios que las soportan, y muestra los aspectos transversales de seguridad y ética, calidad y operación que atraviesan todas las capas.
-`);
-
-sections.push(`## 10. Matriz de trazabilidad
-
-${table(['Requerimiento', 'Nombre', 'Casos de uso', 'Módulos', 'Tablas', 'Proceso BPMN', 'KPI', 'Prueba'], TRACE)}
-
-La columna «Prueba» remite a las evidencias propuestas en el Anexo 2 del informe. Esta matriz extiende la trazabilidad del informe (requisito → KPI → prueba) hacia el diseño: requisito → caso de uso → módulo → tabla → proceso.
-`);
-
 writeFileSync(`${root}docs/ES2_Arquitectura.md`, sections.join('\n'), 'utf8');
 console.log('SQL: backend/migrations/001_modelo_mvp.sql');
 console.log('Documentos: docs/ES2_Arquitectura.md, docs/diccionario_de_datos.md');
+console.log(`Figuras: docs/entrega_es2 (${SELECTION.length - missing.length} de ${SELECTION.length})`);

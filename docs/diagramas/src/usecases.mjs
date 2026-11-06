@@ -38,6 +38,8 @@ export const USE_CASES = [
   { id: 'CU-29', name: 'Consultar los indicadores del piloto', actor: 'Administrador', rf: ['RF007'] },
   { id: 'CU-30', name: 'Operar respaldo y restauración', actor: 'Administrador', rf: ['RNF003'] },
   { id: 'CU-31', name: 'Monitorear disponibilidad y atender incidentes', actor: 'Administrador', rf: ['RNF003'] },
+  // Participante (agregado después de numerar los demás)
+  { id: 'CU-32', name: 'Cambiar una sesión a otro día', actor: 'Participante', rf: ['RF007'] },
 ];
 const uc = id => USE_CASES.find(item => item.id === id);
 
@@ -61,17 +63,19 @@ export function useCasesParticipant() {
   cases['CU-17'] = usecase(s, rx, yOf('CU-03'), 'CU-17', uc('CU-17').name, { rx: 130, ry: 30, ...blue });
   cases['CU-18'] = usecase(s, rx, yOf('CU-04') + 30, 'CU-18', uc('CU-18').name, { rx: 135, ry: 32, ...blue });
   cases['CU-19'] = usecase(s, rx, yOf('CU-09'), 'CU-19', uc('CU-19').name, { rx: 135, ry: 32, ...blue });
+  cases['CU-32'] = usecase(s, rx, yOf('CU-07'), 'CU-32', uc('CU-32').name, { rx: 130, ry: 30, fill: '#fff' });
   cases['CU-12'] = usecase(s, rx, yOf('CU-10') + 6, 'CU-12', uc('CU-12').name, { rx: 130, ry: 30, fill: '#fff' });
   cases['CU-20'] = usecase(s, rx, 1010, 'CU-20', uc('CU-20').name, { rx: 140, ry: 34, ...blue });
   bus(s, person, 282, left.map(id => cases[id]));
   relate(s, cases['CU-03'], cases['CU-17'], 'include');
   relate(s, cases['CU-04'], cases['CU-18'], 'include');
   relate(s, cases['CU-09'], cases['CU-19'], 'include');
+  relate(s, cases['CU-32'], cases['CU-07'], 'extend');
   relate(s, cases['CU-12'], cases['CU-10'], 'extend');
   relate(s, cases['CU-12'], cases['CU-20'], 'include');
   relate(s, cases['CU-15'], cases['CU-20'], 'include');
   relate(s, cases['CU-16'], cases['CU-20'], 'include');
-  s.text(1020, 1080, 'Funciones del sistema (incluidas) en azul. CU-12 extiende a CU-10 solo si hay consentimiento de seguimiento y datos habilitados; CU-15 y CU-16 ajustan las calorías solo con los consentimientos de datos corporales y nutricionales; sin ellos se muestran porciones de referencia. Todo lo que ve la persona proviene del catálogo aprobado por el preparador o la nutricionista (P5).', { size: 12, anchor: 'middle', fill: THEME.sub, maxWidth: 330, valign: 'top' });
+  s.text(1020, 1080, 'Funciones del sistema (incluidas) en azul. CU-32 extiende a CU-07 cuando una sesión sin registrar no se puede hacer ese día. CU-12 extiende a CU-10 solo si hay consentimiento de seguimiento y datos habilitados; CU-15 y CU-16 ajustan las calorías solo con los consentimientos de datos corporales y nutricionales; sin ellos se muestran porciones de referencia. Todo lo que ve la persona proviene del catálogo aprobado por el preparador o la nutricionista (P5).', { size: 12, anchor: 'middle', fill: THEME.sub, maxWidth: 330, valign: 'top' });
   return { id: 'CU1', file: 'cu-1-participante', title: 'CU 1 Casos de uso del participante', svg: s.toString(), width, height };
 }
 

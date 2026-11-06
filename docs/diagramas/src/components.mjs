@@ -30,7 +30,7 @@ export function components() {
   s.rect(ex.x, ex.y, ex.w, ex.h, { r: 14, fill: '#fbfcfe', stroke: THEME.blue.stroke, sw: 2.2, layer: 'bg' });
   s.add('bg', textBlock(ex.x + 16, ex.y + 18, '«execution environment»  Render Web Service · Node.js 24 LTS · 0,5 CPU / 512 MB', { size: 13.5, weight: 700, anchor: 'start', fill: THEME.blue.ink }).svg);
   s.add('bg', textBlock(ex.x + 16, ex.y + 40, 'API REST FitGoal (Express 5), monolito modular', { size: 12.5, anchor: 'start', fill: THEME.sub }).svg);
-  component(s, 470, 150, 920, 82, 'Plataforma transversal', { lines: ['Validación de entradas · autenticación y autorización por rol y por relación con el recurso · límite de solicitudes · cabeceras y CORS · registros sin datos sensibles · /health'], color: THEME.violet, size: 13, sub: 11.5 });
+  component(s, 470, 148, 920, 92, 'Plataforma transversal', { lines: ['Validación de entradas · autenticación y autorización por rol y por relación con el recurso · límite de solicitudes · cabeceras y CORS · registros sin datos sensibles · /health'], color: THEME.violet, size: 13, sub: 11.5 });
   s.rect(462, 250, 936, 408, { r: 10, fill: '#fff', stroke: THEME.faint, sw: 1.5, dash: '6 4', layer: 'bg' });
   s.add('bg', textBlock(478, 266, 'Módulos de negocio', { size: 12.5, weight: 700, anchor: 'start', fill: THEME.sub }).svg);
   const col = i => 478 + i * 228;
@@ -46,7 +46,7 @@ export function components() {
     rutinas: mod(2, 1, 'Rutinas del participante', ['Iniciar recomendada o propia, rutina vigente e historial'], THEME.amber),
     alimentacion: mod(3, 1, 'Alimentación', ['Pautas de 7 días con gramos ajustados a las calorías'], THEME.amber),
     auditoria: mod(0, 2, 'Auditoría', ['Bitácora de solo anexado; la usan Identidad, Perfil, Catálogo, Rutinas, Progreso y Derechos'], THEME.violet, 2),
-    progreso: mod(2, 2, 'Progreso', ['Horario semanal, sesiones, peso, adherencia y racha'], THEME.amber),
+    progreso: mod(2, 2, 'Progreso', ['Horario, sesiones y cambio de día, peso, adherencia y racha'], THEME.amber),
     notif: mod(3, 2, 'Notificaciones', ['Avisos internos sin datos sensibles'], THEME.violet),
   };
   component(s, 470, 676, 920, 84, 'Acceso a datos', { lines: ['Repositorios con SQL parametrizado, transacciones, pool de conexiones acotado y migraciones versionadas'], color: THEME.gray, size: 13, sub: 11.5 });

@@ -1,10 +1,45 @@
 # FitGoal · Arquitectura de la solución (borrador del capítulo para ES2)
 
-Este documento reúne el diseño técnico de FitGoal que exige la Evaluación Sumativa 2: procesos de negocio en BPMN, casos de uso y componentes en UML, modelo y diccionario de datos, topología de comunicaciones, infraestructura y arquitectura integrada. Se redactó tomando como especificación el informe de formulación del 01-10-2026 (`FitGoal_Formulacion_Proyecto_Corregida.docx`) y se genera con código, de modo que los diagramas, el esquema SQL y el diccionario sean coherentes entre sí.
+Este documento reúne el diseño técnico de FitGoal que exige la Evaluación Sumativa 2, ordenado por capas: procesos de negocio en BPMN; capa lógica (casos de uso y componentes en UML); capa de datos (modelo y diccionario de datos), y capa física y de red (topología de comunicaciones, infraestructura y arquitectura TI integral). Se redactó tomando como especificación el informe de formulación del 01-10-2026 (`FitGoal_Formulacion_Proyecto_Corregida.docx`) y se genera con código, de modo que los diagramas, el esquema SQL y el diccionario sean coherentes entre sí.
 
-**Estado de implementación.** Estos diagramas describen el MVP y coinciden con el código del repositorio. El modelo de datos está implementado y verificado como migración SQL (20 tablas, con sus reglas de integridad probadas en PostgreSQL 18), la API Node.js/Express y la app Flutter están construidas según este diseño y tienen pruebas automáticas. Las pautas de alimentación usan contenido de demostración que la nutricionista del proyecto debe revisar y aprobar antes del piloto. Quedan fuera del alcance actual el despliegue en Render y las pruebas de carga.
+**Estado de implementación.** Estos diagramas describen el MVP y coinciden con el código del repositorio. El modelo de datos está implementado y verificado como migración SQL (20 tablas, con sus reglas de integridad probadas en PostgreSQL 18), la API Node.js/Express y la app Flutter están construidas según este diseño y tienen pruebas automáticas. Las pautas de alimentación usan contenido de demostración que la nutricionista del proyecto debe revisar y aprobar antes del piloto. Quedan fuera del alcance actual el despliegue en Render, la integración continua en GitHub Actions y las pruebas de carga: hoy la app, la API y la base de datos corren y se prueban en las estaciones de desarrollo.
 
-**Cómo regenerar.** Desde `docs/diagramas`: `node build.mjs` (diagramas) y `node generate.mjs` (SQL y documentos). `node schema/validate.mjs` aplica el esquema en PostgreSQL y prueba sus reglas.
+**Cómo regenerar.** Desde `docs/diagramas`: `node build.mjs` (diagramas) y `node generate.mjs` (SQL, documentos y figuras numeradas en `docs/entrega_es2`). `node schema/validate.mjs` aplica el esquema en PostgreSQL y prueba sus reglas.
+
+## Diagramas seleccionados para el informe
+
+Las figuras van en este orden y están copiadas con su número en `docs/entrega_es2`, listas para insertarlas en el informe.
+
+| Figura | Capa | Diagrama | Archivo |
+| --- | --- | --- | --- |
+| 1 | Procesos de negocio (BPMN) | P1 · Registro, perfil y recomendación de rutinas aprobadas (nivel 1) | entrega_es2/01-bpmn-p1-registro-y-recomendacion.png |
+| 2 | Procesos de negocio (BPMN) | P1 · Subprocesos SP1.1 a SP1.3 | entrega_es2/02-bpmn-p1-subprocesos.png |
+| 3 | Procesos de negocio (BPMN) | P3 · Seguimiento de sesiones y progreso (nivel 1) | entrega_es2/03-bpmn-p3-seguimiento.png |
+| 4 | Procesos de negocio (BPMN) | P3 · Subprocesos SP3.1 a SP3.3 | entrega_es2/04-bpmn-p3-subprocesos.png |
+| 5 | Procesos de negocio (BPMN) | P5 · Gobierno del catálogo: aprobación profesional (nivel 1) | entrega_es2/05-bpmn-p5-catalogo-profesional.png |
+| 6 | Procesos de negocio (BPMN) | P5 · Subprocesos SP5.1 y SP5.2 | entrega_es2/06-bpmn-p5-subprocesos.png |
+| 7 | Capa lógica | Casos de uso del participante | entrega_es2/07-cu-1-participante.png |
+| 8 | Capa lógica | Casos de uso de profesionales y administración | entrega_es2/08-cu-2-profesionales-y-administracion.png |
+| 9 | Capa lógica | Diagrama de componentes | entrega_es2/09-ar-1-componentes.png |
+| 10 | Capa de datos | Modelo de datos: vista general (20 tablas en 4 módulos) | entrega_es2/10-er-0-general.png |
+| 11 | Capa de datos | Modelo de datos: identidad, consentimiento y derechos | entrega_es2/11-er-1-identidad.png |
+| 12 | Capa de datos | Modelo de datos: catálogo de entrenamiento y reglas | entrega_es2/12-er-2-catalogo.png |
+| 13 | Capa de datos | Modelo de datos: catálogo nutricional y cambios de alimento | entrega_es2/13-er-2b-alimentacion.png |
+| 14 | Capa de datos | Modelo de datos: perfil y rutinas del participante | entrega_es2/14-er-3-planes.png |
+| 15 | Capa de datos | Modelo de datos: seguimiento, avisos y trazabilidad | entrega_es2/15-er-4-seguimiento.png |
+| 16 | Capa física y de red | Topología de comunicaciones | entrega_es2/16-ar-2-topologia.png |
+| 17 | Capa física y de red | Diagrama de infraestructura | entrega_es2/17-ar-3-infraestructura.png |
+| 18 | Capa física y de red | Arquitectura TI integral de la solución | entrega_es2/18-ar-4-arquitectura-integrada.png |
+
+**Los tres procesos BPMN del cuerpo del informe.** Se modelaron cinco procesos; en el cuerpo van los tres que sostienen el servicio, y cada uno con sus subprocesos:
+
+| Proceso | Por qué es de los más importantes |
+| --- | --- |
+| P1 · Registro, perfil y recomendación | Es la puerta de entrada y entrega la propuesta de valor: consentimiento informado, datos de salud opcionales e IMC, y rutinas aprobadas al instante. Cubre RF001, RF002, RF004 y RF009 y los KPI K1 y K6. |
+| P3 · Seguimiento de sesiones y progreso | Es el proceso que se repite cada semana y el que produce los datos de adherencia y retención con que se evalúa el piloto (K2, K3 y K4). Incluye el cierre semanal automático y el cambio de día de una sesión. |
+| P5 · Gobierno del catálogo | Sostiene la credibilidad y la seguridad del servicio: un profesional competente aprueba una sola vez, con versión y auditoría, todo lo que reciben las personas (RF006, K5). Es la decisión de diseño que reemplazó la revisión caso a caso y permite escalar. |
+
+P2 (inicio de la rutina) y P4 (derechos sobre los datos) quedan en el Anexo A. P2 continúa directamente a P1, y su garantía principal (lo que se inicia ya está aprobado) la explica P5. P4 responde a una obligación legal y puede citarse junto a la normativa en la sección de calidad. Los diagramas de estados y de secuencia complementan la capa lógica y quedan en el Anexo B.
 
 ## 1. Contexto del sistema
 
@@ -14,9 +49,9 @@ FitGoal es usado por cuatro roles: el participante, el preparador físico, la nu
 
 ## 2. Procesos de negocio (BPMN)
 
-Se modelaron cinco procesos principales con BPMN 2.0. Los tres primeros forman el ciclo de valor de FitGoal para la persona: incorporarla y recomendarle rutinas aprobadas (P1), dejarla empezar de inmediato una rutina recomendada o propia (P2) y acompañar su seguimiento (P3). El cuarto (P4) responde a una obligación legal y ética propia de trabajar con datos asociados a salud: atender los derechos del titular sobre sus datos. El quinto (P5) es el control de calidad del servicio: el profesional aprueba una sola vez, con versión y trazabilidad, todo lo que reciben las personas. Cada proceso tiene un diagrama de nivel 1, con carriles por actor, y otro con sus subprocesos expandidos. Las tareas azules son automáticas y representan la optimización del proceso: lo que el sistema resuelve sin intervención humana.
+Los procesos se modelaron con BPMN 2.0. Cada uno tiene un diagrama de nivel 1, con carriles por actor, y otro con sus subprocesos expandidos. Las tareas azules son automáticas y representan la optimización del proceso: lo que el sistema resuelve sin intervención humana.
 
-Los procesos se conectan así: P5 prepara el catálogo aprobado que usan P1 y P2; P1 termina con la lista de rutinas para elegir; P2 inicia la rutina vigente que alimenta P3; un cambio de perfil en P3 vuelve a P1 para ver nuevas recomendaciones; y P4 puede iniciarse en cualquier momento del ciclo. No existe revisión caso a caso: la persona recibe al instante lo que ya está aprobado.
+Los tres procesos principales forman un ciclo: P5 prepara el catálogo aprobado; P1 incorpora a la persona y le recomienda rutinas de ese catálogo; la persona inicia su rutina (P2, en el anexo) y P3 acompaña su seguimiento semana a semana; un cambio de perfil en P3 vuelve a P1 para ver nuevas recomendaciones. No existe revisión caso a caso: la persona recibe al instante lo que ya está aprobado.
 
 ### P1 · Registro, perfil y recomendación de rutinas aprobadas
 
@@ -50,38 +85,6 @@ Los procesos se conectan así: P5 prepara el catálogo aprobado que usan P1 y P2
 
 **Optimización.** No hay cola de espera: la recomendación sale del catálogo que el preparador ya aprobó (P5) y se calcula en menos de 5 segundos. Cambiar el perfil no modifica la rutina vigente: solo actualiza las recomendaciones.
 
-### P2 · Inicio de la rutina: recomendada o propia
-
-![Inicio de la rutina: recomendada o propia](diagramas/out/png/bpmn-p2-inicio-de-rutina.png)
-
-![P2 subprocesos](diagramas/out/png/bpmn-p2-subprocesos.png)
-
-| Elemento | Descripción |
-| --- | --- |
-| Objetivo | Permitir que la persona empiece de inmediato una rutina aprobada por el preparador, o arme la propia con ejercicios aprobados, sin revisión caso a caso. |
-| Disparador | La persona elige una rutina de la lista o decide armar la suya. |
-| Actores | Participante y sistema FitGoal. |
-| Resultado | Rutina vigente con sus ejercicios y sus sesiones programadas; la rutina anterior, si la había, queda reemplazada en el historial. |
-| Requerimientos | RF004, RF006, RF007, RNF004 |
-| Indicadores | K5 (100% de las rutinas vigentes compuestas por contenido aprobado) y K6 (p95 menor a 5 segundos). |
-
-**Flujo.**
-
-1. La persona elige cómo empezar: una rutina recomendada del catálogo o una propia.
-2. Rutina recomendada: abre el detalle, revisa sesiones y ejercicios con su indicación y elige entre el mínimo y el máximo de días que contempla la rutina (SP2.1).
-3. Rutina propia: le pone un nombre, elige sus días y agrega ejercicios de la biblioteca, con sugerencias según su objetivo; ajusta series, repeticiones o segundos dentro de límites seguros (SP2.2).
-4. Si ya tenía una rutina, la app pide confirmar el reemplazo. El sistema reemplaza la vigente, quita las sesiones futuras sin hacer, programa las sesiones desde el día siguiente y registra el evento de uso y la auditoría.
-5. La persona ve su rutina y su agenda; el seguimiento continúa en P3.
-
-**Subprocesos.**
-
-| Subproceso | Qué hace | Trazabilidad |
-| --- | --- | --- |
-| SP2.1 Inicio de rutina recomendada | Verificar consentimiento y perfil, que la rutina siga aprobada y vigente y que los días elegidos estén en su rango; copiar los ejercicios de la plantilla a la rutina del participante y guardarla con la versión de la plantilla, de las reglas y del perfil. | RF004, RF006 |
-| SP2.2 Armado de rutina propia | Verificar consentimiento, perfil, nombre y semanas; exigir una sesión por día con ejercicios aprobados y sin repetir; validar series (1 a 6), repeticiones (1 a 50) o segundos (5 a 600); completar con la indicación sugerida por el profesional si no ajustó; guardar la rutina propia. | RF004, RF006 |
-
-**Optimización.** La rutina empieza al instante porque todo lo que contiene ya fue aprobado en P5. La base de datos impide iniciar una plantilla o usar un ejercicio que no esté aprobado y congela la rutina iniciada. No hay trabajo manual por persona, lo que permite escalar el servicio.
-
 ### P3 · Seguimiento de sesiones y progreso
 
 ![Seguimiento de sesiones y progreso](diagramas/out/png/bpmn-p3-seguimiento.png)
@@ -93,17 +96,18 @@ Los procesos se conectan así: P5 prepara el catálogo aprobado que usan P1 y P2
 | Objetivo | Permitir que el participante vea cada día qué le toca (la sesión o el descanso), registre las sesiones realizadas y observe su continuidad con la adherencia, la racha y el calendario, calculados de forma automática. |
 | Disparador | El participante tiene una rutina vigente (fin de P2). |
 | Actores | Participante y sistema FitGoal. |
-| Resultado | Sesiones registradas, historial actualizado, adherencia y racha calculadas; un cambio de perfil vuelve a P1 para ver nuevas recomendaciones. |
+| Resultado | Sesiones registradas o cambiadas de día, historial actualizado, adherencia y racha calculadas; un cambio de perfil vuelve a P1 para ver nuevas recomendaciones. |
 | Requerimientos | RF002, RF007, RF008, RF009 |
 | Indicadores | K2 (retención en la semana 4), K3 (adherencia declarada mayor o igual a 75%) y K4 (utilidad percibida). |
 
 **Flujo.**
 
 1. El participante consulta su horario semanal (lunes a domingo); el sistema entrega la sesión de cada día con sus ejercicios aprobados, o el día de descanso con movilidad opcional del catálogo aprobado.
-2. Realiza la sesión en el modo sesión de la app (marca sus series y usa el temporizador de descanso) o fuera de ella, y la registra como realizada, con su peso solo si está habilitado y hay consentimiento (SP3.1).
-3. El sistema actualiza el historial, la adherencia y la racha (las sesiones registradas y los días de descanso suman; el comodín semanal cubre una sesión sin registro por semana); el participante consulta su progreso y su calendario.
-4. Cada domingo a las 23:59 el sistema cierra la semana (SP3.2): las sesiones no registradas cuentan como no realizadas y, si el participante lo activó, crea un recordatorio interno.
-5. Si el participante cambia su disponibilidad u objetivo, el flujo continúa en P1 con nuevas recomendaciones, y su rutina vigente se mantiene hasta que inicie otra.
+2. Si no puede hacer la sesión ese día, la cambia a un día libre (SP3.3): de hoy hasta 6 días después de su fecha, si venció hace 7 días o menos. El día original queda como «movida», que no suma ni corta la racha.
+3. Si puede, realiza la sesión en el modo sesión de la app (marca sus series y usa el temporizador de descanso) o fuera de ella, y la registra como realizada, con su peso solo si está habilitado y hay consentimiento (SP3.1).
+4. El sistema actualiza el historial, la adherencia y la racha (las sesiones registradas y los días de descanso suman; el comodín semanal cubre una sesión sin registro por semana); el participante consulta su progreso y su calendario.
+5. Cada domingo a las 23:59 el sistema cierra la semana (SP3.2): las sesiones no registradas cuentan como no realizadas y, si el participante lo activó, crea un recordatorio interno.
+6. Si el participante cambia su disponibilidad u objetivo, el flujo continúa en P1 con nuevas recomendaciones, y su rutina vigente se mantiene hasta que inicie otra.
 
 **Subprocesos.**
 
@@ -111,39 +115,9 @@ Los procesos se conectan así: P5 prepara el catálogo aprobado que usan P1 y P2
 | --- | --- | --- |
 | SP3.1 Registro de sesión y peso | Verificar que la sesión es de la rutina vigente del participante y que su fecha no es futura, marcarla como realizada, verificar consentimiento y habilitación antes de guardar el peso, registrar el evento seudonimizado y recalcular la racha. | RF007, RF009, RNF002 |
 | SP3.2 Cierre semanal y adherencia | Contar sesiones programadas y declaradas, tratar las no registradas como no realizadas (aunque el comodín semanal proteja la racha), calcular la adherencia acumulada con el denominador inicial, guardar el evento y crear el recordatorio si corresponde. El comodín de la racha se renueva cada lunes. | RF007, RF008 |
+| SP3.3 Cambio de día de la sesión | Verificar que la sesión es del participante, de su rutina vigente y está sin registrar, y que venció hace 7 días o menos; ofrecer los días libres de hoy a 6 días después de su fecha, avisando si alguno queda junto a otra sesión; validar el día elegido, mover la sesión guardando la fecha original, registrar la auditoría y recalcular el horario y la racha. | RF007 |
 
-**Optimización.** Las sesiones se programan automáticamente al iniciar la rutina; la adherencia y la racha se calculan sin intervención y no se guardan (se deducen de las sesiones y de los días de la rutina). La racha cuenta los descansos para no premiar entrenar sin descanso. El peso es opcional y se bloquea sin consentimiento, de modo que el seguimiento no exige datos que el participante no haya autorizado.
-
-### P4 · Atención de derechos sobre datos personales
-
-![Atención de derechos sobre datos personales](diagramas/out/png/bpmn-p4-derechos-de-datos.png)
-
-![P4 subprocesos](diagramas/out/png/bpmn-p4-subproceso.png)
-
-| Elemento | Descripción |
-| --- | --- |
-| Objetivo | Responder en plazo y con trazabilidad las solicitudes del titular sobre sus datos, tratándose de datos asociados a salud. |
-| Disparador | El participante quiere ejercer un derecho sobre sus datos. |
-| Actores | Participante, sistema FitGoal y responsable de operación (administrador). |
-| Resultado | Solicitud resuelta con comprobante, registro de la resolución y auditoría. |
-| Requerimientos | RF009, RF010, RNF002 |
-| Indicadores | Se propone medir el porcentaje de solicitudes respondidas dentro del plazo (se formaliza en la sección de KPI y SLA). |
-
-**Flujo.**
-
-1. El participante elige el tipo de derecho (acceso, rectificación, oposición, bloqueo, exportación o eliminación) y envía la solicitud.
-2. El sistema la registra, emite el comprobante y calcula el plazo: 30 días corridos, o 2 días hábiles para el bloqueo.
-3. El responsable de operación verifica la identidad y el alcance. Si quedan 5 días del plazo, evalúa la prórroga única de hasta 30 días.
-4. Si procede, ejecuta el derecho según su tipo (SP4.1); si no, responde con el fundamento del rechazo.
-5. El sistema registra la resolución, audita y avisa al titular, que recibe la respuesta y el comprobante.
-
-**Subprocesos.**
-
-| Subproceso | Qué hace | Trazabilidad |
-| --- | --- | --- |
-| SP4.1 Ejecución según el tipo de derecho | Acceso: copia de los datos. Rectificación: nueva versión del perfil conservando la anterior. Oposición: dejar de tratar para la finalidad opcional y registrar la revocación, con borrado de la estatura y el peso. Bloqueo: suspender el tratamiento afectado dentro de 2 días hábiles. Exportación: archivo portable en JSON. Eliminación: eliminar o anonimizar y registrar la solicitud para reaplicarla tras restaurar copias. | RF009 |
-
-**Optimización.** El comprobante y el plazo se calculan automáticamente, el sistema alerta antes del vencimiento y la ejecución queda auditada. Las eliminaciones se registran para reaplicarse si se restaura una copia de respaldo.
+**Optimización.** Las sesiones se programan automáticamente al iniciar la rutina; la adherencia y la racha se calculan sin intervención y no se guardan (se deducen de las sesiones y de los días de la rutina). La racha cuenta los descansos para no premiar entrenar sin descanso. Cambiar una sesión de día evita que un imprevisto se convierta en una sesión perdida, sin pedir ayuda a nadie. El peso es opcional y se bloquea sin consentimiento, de modo que el seguimiento no exige datos que el participante no haya autorizado.
 
 ### P5 · Gobierno del catálogo: aprobación profesional
 
@@ -177,15 +151,17 @@ Los procesos se conectan así: P5 prepara el catálogo aprobado que usan P1 y P2
 
 **Optimización.** El profesional trabaja una sola vez por contenido y no por cada persona: su criterio llega a todas sin cola de espera. La base de datos exige la competencia del aprobador, impide editar una versión aprobada y garantiza que una rutina solo use ejercicios aprobados.
 
-## 3. Casos de uso (UML)
+## 3. Capa lógica
+
+### 3.1 Casos de uso (UML)
 
 ![Casos de uso del participante](diagramas/out/png/cu-1-participante.png)
 
 ![Casos de uso de profesionales y administración](diagramas/out/png/cu-2-profesionales-y-administracion.png)
 
-Los 31 casos de uso cubren los diez requerimientos funcionales. CU-02 (autenticación) es previo a todos los casos protegidos. CU-17 a CU-20 son funciones del sistema incluidas por otros casos; CU-12 extiende a CU-10 y CU-23 extiende a CU-21 y CU-22. Cada caso se relaciona con el problema del informe: personas que no saben estructurar un plan coherente (CU-03 a CU-09, con rutinas recomendadas y ayuda para armar la propia), la necesidad de validación profesional sin frenar el uso (CU-21 a CU-24: el profesional aprueba el catálogo una sola vez), el seguimiento que sostiene la continuidad (CU-10 a CU-13) y el cuidado de datos de salud (CU-12, CU-14, CU-20, CU-27).
+Los 32 casos de uso cubren los diez requerimientos funcionales. CU-02 (autenticación) es previo a todos los casos protegidos. CU-17 a CU-20 son funciones del sistema incluidas por otros casos; CU-32 extiende a CU-07, CU-12 extiende a CU-10 y CU-23 extiende a CU-21 y CU-22. CU-32 se agregó después de numerar los demás, por eso queda al final. Cada caso se relaciona con el problema del informe: personas que no saben estructurar un plan coherente (CU-03 a CU-09, con rutinas recomendadas y ayuda para armar la propia), la necesidad de validación profesional sin frenar el uso (CU-21 a CU-24: el profesional aprueba el catálogo una sola vez), el seguimiento que sostiene la continuidad (CU-10 a CU-13 y CU-32) y el cuidado de datos de salud (CU-12, CU-14, CU-20, CU-27).
 
-### Especificación de los casos de uso
+#### Especificación de los casos de uso
 
 | Caso de uso | Actor | Requerimientos | Precondición | Flujo principal | Flujos alternativos | Postcondición |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -208,7 +184,7 @@ Los 31 casos de uso cubren los diez requerimientos funcionales. CU-02 (autentica
 | **CU-17** Validar perfil | Sistema | RF001, RF002 | Perfil recibido. | 1) Valida tipos y rangos: edad entera de 18 o más, 1 a 7 días únicos, duración de 20, 30, 45 o 60 minutos, objetivo, nivel y equipo. 2) Si informa el sexo y la actividad, exige la estatura, el peso y el consentimiento «datos_nutricionales». 3) Si informa la estatura y el peso, exige que vayan juntos, que estén en rangos humanos y que exista el consentimiento específico «datos_corporales». | Datos inválidos: error 400 con el campo. Estatura y peso sin consentimiento: 403. | Perfil válido, o error con el campo afectado. |
 | **CU-18** Recomendar rutinas aprobadas | Sistema | RF004 | Perfil válido y reglas de entrenamiento aprobadas vigentes. | 1) Calcula el IMC (peso / estatura²) y su categoría con los cortes de la OMS, o del Minsal desde los 65 años; sin estatura y peso (o sin consentimiento vigente) usa la categoría «general». 2) Aplica los ajustes de seguridad de las reglas aprobadas: con bajo peso no se recomienda bajar de peso y con obesidad no se recomienda subir de peso. 3) Elige la división de la semana con la regla aprobada: principiante → full body; con experiencia y 6 o más días → push/pull/legs; con 4 o 5 días → upper/lower; si no, full body. 4) Busca en la matriz la rutina aprobada y vigente para objetivo × nivel × equipo × categoría × división; las otras divisiones de la misma combinación quedan como alternativas. 5) Marca avisos de ajuste (más o menos días, o más minutos, que su perfil) sin descartar la rutina. 6) Devuelve la lista con la recomendada primero, sus motivos (incluido el de la división) y los avisos de cuidado: el IMC es solo una referencia. | Sin coincidencia o sin reglas: no hay recomendadas y el catálogo sigue disponible. | Lista ordenada con motivos. |
 | **CU-19** Sugerir ejercicios según el objetivo | Sistema | RF004 | Perfil válido y reglas de entrenamiento aprobadas vigentes. | 1) Lee de las reglas los grupos de ejercicios sugeridos para el objetivo. 2) Filtra los ejercicios aprobados por el nivel y el equipo del perfil y, con sobrepeso u obesidad, deja fuera los de alto impacto. 3) Ordena primero los grupos sugeridos y agrega el motivo de cada sugerencia. | Sin perfil o sin reglas aprobadas: 409, y el selector usa la biblioteca completa. | Ejercicios sugeridos, sin impedir elegir cualquier otro. |
-| **CU-20** Verificar consentimiento y habilitación de datos | Sistema | RF009, RNF002 | Operación que requiere datos de salud o nutricionales. | 1) Consulta el último consentimiento por finalidad (datos corporales y nutricionales). 2) Al revocarse, borra de todas las versiones del perfil los datos que autorizaba. | Sin consentimiento vigente o revocado: 403 con explicación. | Operación autorizada o rechazada. |
+| **CU-20** Verificar consentimiento y habilitación de datos | Sistema | RF009, RNF002 | Operación que requiere datos de salud o nutricionales. | 1) Consulta el último consentimiento por finalidad (datos corporales y nutricionales). 2) Al revocarse, borra de todas las versiones del perfil los datos que autorizaba y el historial de peso. | Sin consentimiento vigente o revocado: 403 con explicación. | Operación autorizada o rechazada. |
 | **CU-21** Gestionar los ejercicios del catálogo | Preparador físico | RF004, RF006 | Rol preparador físico. | 1) Crea un ejercicio en borrador con descripción, grupo, nivel mínimo, equipo e indicación sugerida. 2) Guarda y registra la auditoría. 3) Puede retirar un ejercicio aprobado. | Un ejercicio usado por una rutina aprobada no se retira hasta retirar esas rutinas. | Ejercicio en borrador listo para aprobar (CU-23). |
 | **CU-22** Gestionar las rutinas del catálogo | Preparador físico | RF004, RF006 | Rol preparador físico. | 1) Crea una rutina en borrador: objetivo, nivel, equipo, categoría de IMC, rango de días, duración, semanas y resumen. 2) Compone las sesiones con ejercicios e indicaciones. 3) Guarda como versión nueva y registra la auditoría. 4) Puede retirar una rutina aprobada. | Una rutina aprobada no se edita: se crea una versión nueva. Las rutinas ya iniciadas por las personas no cambian. | Rutina en borrador lista para aprobar (CU-23). |
 | **CU-23** Aprobar ejercicios y rutinas | Preparador físico | RF006 | Ejercicio o rutina en borrador y rol preparador físico. | 1) Revisa el contenido. 2) Aprueba: el sistema verifica que los ejercicios de una rutina estén aprobados. 3) Registra aprobador, rol y fecha y retira la versión aprobada anterior. 4) Desde ese momento todas las personas lo ven. | Si falta aprobar un ejercicio, 409 con la lista. La base de datos exige que el aprobador tenga rol preparador. | Contenido vigente para todas las personas. |
@@ -220,8 +196,9 @@ Los 31 casos de uso cubren los diez requerimientos funcionales. CU-02 (autentica
 | **CU-29** Consultar los indicadores del piloto | Administrador | RF007 | Piloto en ejecución o con datos de prueba. | 1) El administrador elige un indicador (K1 a K9). 2) El sistema calcula numerador y denominador con eventos seudonimizados, sesiones y rutinas. 3) Muestra el tamaño de la muestra y sus límites. | Sin datos: se informa «sin mediciones»; no se estiman resultados. | Indicador mostrado. |
 | **CU-30** Operar respaldo y restauración | Administrador | RNF003 | Job de respaldo configurado. | 1) Verifica la ejecución diaria del respaldo. 2) Restaura una copia en un ambiente aislado. 3) Comprueba los conteos de perfiles, rutinas y consentimientos. 4) Reaplica las eliminaciones pendientes. 5) Registra el RPO y el RTO medidos. | Si la restauración falla o supera el RTO de 4 horas, se registra como incidente y se corrige antes del piloto. | Recuperación demostrada. |
 | **CU-31** Monitorear disponibilidad y atender incidentes | Administrador | RNF003 | Servicio desplegado. | 1) Revisa los sondeos de API y base de datos, cada 5 minutos. 2) Ante una falla, detiene el acceso afectado y preserva los registros técnicos. 3) Evalúa el alcance y las obligaciones de comunicación. 4) Restablece el servicio y registra el incidente. | Si hay riesgo para datos personales, se activa la evaluación de obligaciones de comunicación. | Servicio restablecido e incidente registrado. |
+| **CU-32** Cambiar una sesión a otro día | Participante | RF007 | Rutina vigente con una sesión sin registrar de hoy, de un día futuro o vencida hace 7 días o menos. | 1) En «Mi rutina» o en el horario, el participante toca «Cambiar de día» en la sesión que no puede hacer. 2) El sistema ofrece los días libres desde hoy hasta 6 días después de la fecha de la sesión y avisa si alguno queda junto a otra sesión, sin descanso entre ambas. 3) El participante elige un día. 4) El sistema mueve la sesión, guarda la fecha original y registra la auditoría. 5) El horario muestra la sesión en su nuevo día y el día original como «movida». | Sesión registrada, de una rutina reemplazada o vencida hace más de 7 días: 409, con la sugerencia de registrarla si la hizo. Día ocupado por otra sesión: 409. Día pasado o fuera del rango: 400. | Sesión reprogramada; el día «movida» no suma ni corta la racha y la adherencia la cuenta en su nueva fecha. |
 
-## 4. Diagrama de componentes
+### 3.2 Diagrama de componentes
 
 ![Diagrama de componentes](diagramas/out/png/ar-1-componentes.png)
 
@@ -242,7 +219,7 @@ El backend es un monolito modular: cada módulo es un componente lógico con res
 | Alimentación | API REST | Pautas de 7 días aprobadas, con los gramos ajustados a las calorías del objetivo; cambio de un alimento por un equivalente aprobado del mismo grupo; catálogo nutricional de la nutricionista (alimentos y pautas). | Cálculo energético; Perfil y consentimiento; Auditoría | GET /meal-plans, GET /meal-plans/{id}, GET /meal-plans/{id}/alternatives, PUT y DELETE /meal-plans/{id}/swaps; /catalog/foods, /catalog/meal-plans (con /approve y /retire) |
 | Recomendación | API REST | Cálculo del IMC, reglas de seguridad, elección de la división de la semana, rutinas recomendadas según las reglas aprobadas, exploración del catálogo, biblioteca de ejercicios y sugerencias según el objetivo. | Perfil y consentimiento; Catálogo | GET /routines, GET /routines/{id}, GET /exercises, GET /exercises/suggestions |
 | Rutinas del participante | API REST | Iniciar una rutina recomendada o propia, validar y copiar su contenido, programar sesiones, rutina vigente e historial. | Recomendación; Perfil y consentimiento; Catálogo; Auditoría | POST /plans/start; GET /plans/me; GET /plans/me/history |
-| Progreso | API REST | Horario semanal con días de descanso, sesiones programadas y realizadas, peso con consentimiento, adherencia, racha con comodín semanal y calendario. | Rutinas del participante (rutina vigente); Perfil y consentimiento; Notificaciones | GET /schedule/me; GET /sessions/me; POST /sessions/{id}/complete; GET y POST /weights/me; GET /progress/me |
+| Progreso | API REST | Horario semanal con días de descanso, sesiones programadas y realizadas, cambio de día de una sesión sin registrar, peso con consentimiento, adherencia, racha con comodín semanal y calendario. | Rutinas del participante (rutina vigente); Perfil y consentimiento; Notificaciones; Auditoría | GET /schedule/me; GET /sessions/me; POST /sessions/{id}/complete; GET /sessions/{id}/move-options; POST /sessions/{id}/move; GET y POST /weights/me; GET /progress/me |
 | Notificaciones | API REST | Avisos internos sin información sensible y recordatorios de sesiones. | Acceso a datos | GET /notifications/me; POST /notifications/{id}/read |
 | Derechos de datos | API REST | Solicitudes del titular, comprobantes, plazos y ejecución por tipo de derecho. | Perfil y consentimiento; Identidad; Auditoría | GET y POST /data-requests; GET /admin/data-requests; POST /admin/data-requests/{id}/resolve |
 | Auditoría | API REST | Bitácora de solo anexado con autor, fecha, entidad y versión. | Acceso a datos | GET /admin/audit |
@@ -251,7 +228,9 @@ El backend es un monolito modular: cada módulo es un componente lógico con res
 | Job de respaldo | Cron job (Render) | Exportación diaria con pg_dump y cifrado AES-256 hacia el almacenamiento externo. | PostgreSQL; Almacenamiento externo | — |
 | Sondeo externo | Servicio externo | Consulta /health cada 5 minutos para medir la disponibilidad. | API REST | GET /health |
 
-## 5. Modelo de datos
+## 4. Capa de datos
+
+### 4.1 Modelo de datos
 
 ![Vista general del modelo de datos](diagramas/out/png/er-0-general.png)
 
@@ -267,7 +246,7 @@ El modelo relacional tiene 20 tablas en cuatro módulos y se implementa en Postg
 
 ![ER 4](diagramas/out/png/er-4-seguimiento.png)
 
-### Correspondencia con las entidades del informe
+#### Correspondencia con las entidades del informe
 
 | Entidad del informe | Tabla | Observación |
 | --- | --- | --- |
@@ -279,11 +258,11 @@ El modelo relacional tiene 20 tablas en cuatro módulos y se implementa en Postg
 | Minuta (pauta de alimentación) | meal_plan_templates, meal_plan_items, foods, meal_plan_swaps | Pauta de 7 días por tipo de dieta, aprobada una sola vez por la nutricionista con alimentos aprobados; la API ajusta los gramos a las calorías de cada persona, que puede cambiar un alimento que no tiene por otro aprobado del mismo grupo de esa pauta. |
 | Rutina del participante (plan vigente) | user_plans, user_plan_exercises | Copia inmutable de una rutina aprobada, o rutina propia con ejercicios aprobados; una sola vigente por persona. |
 | Aprobación profesional | exercises, routine_templates, foods, meal_plan_templates, rule_versions (status, approved_by, approved_by_role) | La base exige que quien aprueba tenga el rol competente; solo lo aprobado se ofrece a las personas. |
-| Sesión | training_sessions (entrenamiento), auth_sessions (acceso) | Sesión programada y declarada; la sesión de autenticación se guarda aparte. |
+| Sesión | training_sessions (entrenamiento), auth_sessions (acceso) | Sesión programada, declarada o cambiada de día; la sesión de autenticación se guarda aparte. |
 | Consentimiento | consents | Registro anexado con la versión de la política. |
 | Auditoría | audit_log | Bitácora de solo anexado. |
 
-### Relaciones
+#### Relaciones
 
 | Tabla hija | Columnas | Tabla padre | Columnas | Cardinalidad |
 | --- | --- | --- | --- | --- |
@@ -320,7 +299,7 @@ El modelo relacional tiene 20 tablas en cuatro módulos y se implementa en Postg
 | notifications | user_id | users | id | 1 : 0..N |
 | audit_log | actor_id | users | id | 0..1 : 0..N |
 
-### Disparadores y funciones
+#### Disparadores y funciones
 
 | Nombre | Tabla | Finalidad |
 | --- | --- | --- |
@@ -331,21 +310,49 @@ El modelo relacional tiene 20 tablas en cuatro módulos y se implementa en Postg
 | meal_plan_items_frozen | meal_plan_items | Impide cambiar los alimentos de una pauta que ya no es borrador (se crea una versión nueva), exige alimentos aprobados al aprobarla e impide borrar una pauta aprobada. |
 | meal_plan_swaps_valid | meal_plan_swaps | Un alimento solo se cambia en una pauta aprobada y por otro distinto, aprobado, del mismo grupo y que la nutricionista incluyó en esa misma pauta. |
 
-### Verificación del modelo
+#### Verificación del modelo
 
 El script `docs/diagramas/schema/validate.mjs` aplica la migración en un PostgreSQL real (PGlite 0.5.8, que ejecuta PostgreSQL 18.3) y ejecuta 79 comprobaciones de integridad: contraseña con Argon2id, correo único sin distinguir mayúsculas, perfil adulto, días válidos, estatura y peso juntos y en rangos humanos, sexo y actividad solo con estatura y peso, competencia del aprobador de ejercicios, rutinas, alimentos, pautas y reglas, plantillas aprobadas inmutables, división válida y sesiones con nombre, solo plantillas y ejercicios aprobados en una rutina, rutina iniciada inmutable (con los nombres de sus sesiones), una sola rutina vigente, sesión movida con su fecha original distinta de la nueva, composición plausible de los alimentos, pautas solo con alimentos aprobados e inmutables una vez aprobadas, cambios de alimento solo por otro aprobado del mismo grupo que la pauta incluye, bitácora de solo anexado y formato del seudónimo.
 
-El diccionario de datos completo, con cada columna, tipo, restricción y descripción, está en `docs/diccionario_de_datos.md`.
+### 4.2 Diccionario de datos
 
-## 6. Comportamiento
+El diccionario completo está en `docs/diccionario_de_datos.md` y se genera desde el mismo esquema que la migración SQL. Por cada tabla documenta todas sus columnas (tipo, obligatoriedad, clave, valor por defecto, restricciones y descripción), sus reglas de integridad, índices y disparadores, la clasificación de sus datos y lo que ocurre con ellos al eliminar una cuenta. Incluye además las 33 relaciones con su cardinalidad y acción al borrar, y los 6 disparadores con su momento de ejecución. En total: 204 columnas, 128 reglas de validación, 14 restricciones de unicidad y 17 índices.
 
-![Estados del catálogo y de la rutina](diagramas/out/png/st-1-estados.png)
+| N.º | Tabla | Entidad | Módulo | Columnas | Clave primaria | Clasificación del dato |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | users | Usuario | Identidad, consentimiento y derechos | 11 | id | Identificación y acceso |
+| 2 | auth_sessions | Sesión de autenticación | Identidad, consentimiento y derechos | 9 | id | Identificación y acceso |
+| 3 | consents | Consentimiento | Identidad, consentimiento y derechos | 6 | id | Personal |
+| 4 | data_requests | Solicitud de derechos | Identidad, consentimiento y derechos | 11 | id | Personal |
+| 5 | exercises | Ejercicio | Catálogo profesional y reglas | 16 | id | Catálogo (no personal) |
+| 6 | rule_versions | Versión de reglas | Catálogo profesional y reglas | 11 | id | Catálogo (no personal) |
+| 7 | routine_templates | Plantilla de rutina | Catálogo profesional y reglas | 22 | id | Catálogo (no personal) |
+| 8 | template_exercises | Ejercicio de plantilla | Catálogo profesional y reglas | 5 | template_id, session_no, position | Catálogo (no personal) |
+| 9 | foods | Alimento | Catálogo profesional y reglas | 17 | id | Catálogo (no personal) |
+| 10 | meal_plan_templates | Pauta de alimentación | Catálogo profesional y reglas | 13 | id | Catálogo (no personal) |
+| 11 | meal_plan_items | Alimento de la pauta | Catálogo profesional y reglas | 6 | template_id, day_no, meal, position | Catálogo (no personal) |
+| 12 | profile_versions | Perfil (versionado) | Perfil y rutinas del participante | 15 | id | Sensible (salud) |
+| 13 | user_plans | Rutina del participante | Perfil y rutinas del participante | 15 | id | Personal |
+| 14 | user_plan_exercises | Ejercicio de la rutina | Perfil y rutinas del participante | 5 | plan_id, session_no, position | Personal |
+| 15 | meal_plan_swaps | Cambio de alimento | Perfil y rutinas del participante | 7 | user_id, template_id, day_no, meal, position | Personal |
+| 16 | training_sessions | Sesión de entrenamiento | Seguimiento, avisos y trazabilidad | 10 | id | Personal |
+| 17 | weight_records | Registro de peso | Seguimiento, avisos y trazabilidad | 5 | id | Sensible (salud) |
+| 18 | notifications | Aviso interno | Seguimiento, avisos y trazabilidad | 7 | id | Personal |
+| 19 | audit_log | Auditoría | Seguimiento, avisos y trazabilidad | 9 | id | Trazabilidad |
+| 20 | usage_events | Evento de uso seudonimizado | Seguimiento, avisos y trazabilidad | 4 | id | Seudonimizado |
 
-![Secuencia del flujo crítico](diagramas/out/png/sq-1-secuencia.png)
+| Clasificación | Qué incluye |
+| --- | --- |
+| Identificación y acceso | Datos personales que identifican a la persona o le dan acceso (correo, rol, credenciales protegidas con hash). |
+| Personal | Datos asociados a una persona identificable, sin información de salud. |
+| Sensible (salud) | Datos relativos a la salud o al perfil biológico (estatura, peso, sexo y actividad física); FitGoal los trata como sensibles y solo con consentimiento específico. |
+| Seudonimizado | Datos de uso sin vínculo directo con la cuenta: solo se asocian a un HMAC del identificador. |
+| Trazabilidad | Registro de acciones con el actor y la entidad afectada, sin tokens ni contenido sensible. |
+| Catálogo (no personal) | Contenido profesional del servicio; solo identifica al profesional autor y aprobador. |
 
-El diagrama de estados define dos ciclos de vida. El contenido del catálogo (ejercicios, rutinas y reglas) nace «draft», pasa a «approved» cuando lo aprueba el profesional competente y termina «retired» cuando se retira o se aprueba una versión nueva. La rutina del participante solo está «vigente» o «reemplazada». La secuencia muestra el flujo crítico completo: la aprobación previa del catálogo, el perfil y la recomendación, el inicio inmediato de la rutina y su consulta, con las transacciones que garantizan la consistencia entre aprobación, inicio de la rutina y auditoría.
+## 5. Capa física y de red
 
-## 7. Topología de comunicaciones
+### 5.1 Topología de comunicaciones
 
 ![Topología de comunicaciones](diagramas/out/png/ar-2-topologia.png)
 
@@ -362,25 +369,25 @@ Todo el tráfico del usuario entra por HTTPS (puerto 443) al borde gestionado de
 | 7 | Desarrollo → GitHub → Render | HTTPS 443 o SSH 22; deploy hook por HTTPS | Autenticación individual; secretos fuera del repositorio | Análisis y pruebas en cada cambio; despliegue solo si pasan; revisión del responsable de operación |
 | 8 | Google Play → smartphone | HTTPS, puerto 443 | Firma de la aplicación y canal de Play | Distribución por prueba interna; la producción pública se difiere |
 
-## 8. Infraestructura
+### 5.2 Infraestructura
 
 ![Diagrama de infraestructura](diagramas/out/png/ar-3-infraestructura.png)
 
 | Ambiente | Dónde corre | Datos | Secretos y accesos | Uso y condición |
 | --- | --- | --- | --- | --- |
-| Desarrollo local | Estación de cada integrante: API y PostgreSQL 18 en Docker Compose; la app en emulador o teléfono | Ficticios; sin datos personales ni de salud | Credenciales propias de desarrollo; archivo .env fuera del repositorio | Construir y probar cada cambio; pruebas automáticas con PostgreSQL en proceso (PGlite) |
-| Staging local | Misma configuración, con migraciones y datos de prueba idénticos a los del piloto | Ficticios | Servicios y credenciales separados de los de desarrollo | Aceptación de cada hito y ensayo de revisión y restauración |
+| Desarrollo local | Estación de cada integrante: la API con PostgreSQL 18 en proceso (PGlite); la app en el navegador (Flutter web), el emulador o un teléfono | Ficticios; sin datos personales ni de salud | Credenciales propias de desarrollo; archivo .env fuera del repositorio | Construir y probar cada cambio; pruebas automáticas con PostgreSQL en proceso (PGlite) |
+| Staging local | La misma API conectada por DATABASE_URL a un PostgreSQL 18, con las mismas migraciones y datos de prueba que el piloto | Ficticios | Servicios y credenciales separados de los de desarrollo | Aceptación de cada hito y ensayo de revisión y restauración |
 | Piloto en Render | Servicio web de la API y PostgreSQL 18 gestionados, con respaldo cifrado externo | Reales solo si se resuelve la habilitación de datos; de lo contrario, ficticios | Base de datos y secretos independientes; acceso individual del equipo | Se habilita tras aceptar pruebas, restauración, política de datos y financiamiento |
 
-Las cifras de CPU, memoria y almacenamiento corresponden a las tarifas públicas consultadas el 1 de octubre de 2026 y a las condiciones del presupuesto del informe; deben confirmarse al contratar. La región se definirá al abrir la cuenta, considerando la latencia desde Chile.
+Hoy la app, la API y PostgreSQL en proceso (PGlite) corren y se prueban en las estaciones de desarrollo; Render, el respaldo externo, el sondeo, GitHub Actions, las pruebas de carga con k6 y la distribución por Google Play corresponden al piloto. Las cifras de CPU, memoria y almacenamiento corresponden a las tarifas públicas consultadas el 1 de octubre de 2026 y a las condiciones del presupuesto del informe; deben confirmarse al contratar. La región es Virginia, en Estados Unidos, por tener la menor latencia desde Chile (`docs/evidencia_es2/latencia_regiones.txt`); Render no permite cambiarla en un servicio ya creado.
 
-## 9. Arquitectura de la solución
+### 5.3 Arquitectura TI integral
 
 ![Arquitectura de la solución](diagramas/out/png/ar-4-arquitectura-integrada.png)
 
 La vista integrada une las capas de software (presentación, servicios y datos) con el hardware y los servicios que las soportan, y muestra los aspectos transversales de seguridad y ética, calidad y operación que atraviesan todas las capas.
 
-## 10. Matriz de trazabilidad
+## 6. Matriz de trazabilidad
 
 | Requerimiento | Nombre | Casos de uso | Módulos | Tablas | Proceso BPMN | KPI | Prueba |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -390,7 +397,7 @@ La vista integrada une las capas de software (presentación, servicios y datos) 
 | RF004 | Rutinas recomendadas y propias | CU-04 a CU-09, CU-18, CU-19, CU-21, CU-22 | Catálogo; Recomendación; Rutinas del participante | routine_templates, template_exercises, exercises, rule_versions, user_plans, user_plan_exercises | P1 (SP1.3), P2 (SP2.1, SP2.2) | K5, K6, K9 | P04 |
 | RF005 | Pauta de alimentación de 7 días | CU-16, CU-25 | Alimentación; Cálculo energético; Catálogo | foods, meal_plan_templates, meal_plan_items, meal_plan_swaps, rule_versions | P5 | K5, K6 | P05 |
 | RF006 | Aprobación profesional del catálogo | CU-21 a CU-24 | Catálogo | exercises, routine_templates, rule_versions | P5 (SP5.1, SP5.2) | K5 | P06 |
-| RF007 | Progreso y sesiones | CU-10, CU-11, CU-12, CU-29 | Progreso | training_sessions, weight_records, usage_events | P3 (SP3.1, SP3.2) | K2, K3, K4 | P07 |
+| RF007 | Progreso y sesiones | CU-10, CU-11, CU-12, CU-29, CU-32 | Progreso | training_sessions, weight_records, usage_events | P3 (SP3.1, SP3.2, SP3.3) | K2, K3, K4 | P07 |
 | RF008 | Aviso interno | CU-13 | Notificaciones | notifications | P3 | K2 | P08 |
 | RF009 | Control de datos | CU-01, CU-14, CU-20, CU-27 | Derechos de datos; Perfil y consentimiento | consents, data_requests | P4 (SP4.1) | K1, K5 | P09 |
 | RF010 | Roles y auditoría | CU-02, CU-26, CU-28 | Identidad; Auditoría | users, audit_log | P5 | K5 | P10 |
@@ -400,3 +407,78 @@ La vista integrada une las capas de software (presentación, servicios y datos) 
 | RNF004 | Rendimiento | CU-04, CU-06 | Recomendación; Plataforma | routine_templates, rule_versions | P1 (SP1.3), P2 | K6 | P14 |
 
 La columna «Prueba» remite a las evidencias propuestas en el Anexo 2 del informe. Esta matriz extiende la trazabilidad del informe (requisito → KPI → prueba) hacia el diseño: requisito → caso de uso → módulo → tabla → proceso.
+
+## Anexo A. Procesos complementarios
+
+Estos procesos están modelados con el mismo detalle que los del cuerpo del informe. P2 continúa a P1 y alimenta a P3; P4 puede iniciarse en cualquier momento del ciclo.
+
+### P2 · Inicio de la rutina: recomendada o propia
+
+![Inicio de la rutina: recomendada o propia](diagramas/out/png/bpmn-p2-inicio-de-rutina.png)
+
+![P2 subprocesos](diagramas/out/png/bpmn-p2-subprocesos.png)
+
+| Elemento | Descripción |
+| --- | --- |
+| Objetivo | Permitir que la persona empiece de inmediato una rutina aprobada por el preparador, o arme la propia con ejercicios aprobados, sin revisión caso a caso. |
+| Disparador | La persona elige una rutina de la lista o decide armar la suya. |
+| Actores | Participante y sistema FitGoal. |
+| Resultado | Rutina vigente con sus ejercicios y sus sesiones programadas; la rutina anterior, si la había, queda reemplazada en el historial. |
+| Requerimientos | RF004, RF006, RF007, RNF004 |
+| Indicadores | K5 (100% de las rutinas vigentes compuestas por contenido aprobado) y K6 (p95 menor a 5 segundos). |
+
+**Flujo.**
+
+1. La persona elige cómo empezar: una rutina recomendada del catálogo o una propia.
+2. Rutina recomendada: abre el detalle, revisa sesiones y ejercicios con su indicación y elige entre el mínimo y el máximo de días que contempla la rutina (SP2.1).
+3. Rutina propia: le pone un nombre, elige sus días y agrega ejercicios de la biblioteca, con sugerencias según su objetivo; ajusta series, repeticiones o segundos dentro de límites seguros (SP2.2).
+4. Si ya tenía una rutina, la app pide confirmar el reemplazo. El sistema reemplaza la vigente, quita las sesiones futuras sin hacer, programa las sesiones desde el día siguiente y registra el evento de uso y la auditoría.
+5. La persona ve su rutina y su agenda; el seguimiento continúa en P3.
+
+**Subprocesos.**
+
+| Subproceso | Qué hace | Trazabilidad |
+| --- | --- | --- |
+| SP2.1 Inicio de rutina recomendada | Verificar consentimiento y perfil, que la rutina siga aprobada y vigente y que los días elegidos estén en su rango; copiar los ejercicios de la plantilla a la rutina del participante y guardarla con la versión de la plantilla, de las reglas y del perfil. | RF004, RF006 |
+| SP2.2 Armado de rutina propia | Verificar consentimiento, perfil, nombre y semanas; exigir una sesión por día con ejercicios aprobados y sin repetir; validar series (1 a 6), repeticiones (1 a 50) o segundos (5 a 600); completar con la indicación sugerida por el profesional si no ajustó; guardar la rutina propia. | RF004, RF006 |
+
+**Optimización.** La rutina empieza al instante porque todo lo que contiene ya fue aprobado en P5. La base de datos impide iniciar una plantilla o usar un ejercicio que no esté aprobado y congela la rutina iniciada. No hay trabajo manual por persona, lo que permite escalar el servicio.
+
+### P4 · Atención de derechos sobre datos personales
+
+![Atención de derechos sobre datos personales](diagramas/out/png/bpmn-p4-derechos-de-datos.png)
+
+![P4 subprocesos](diagramas/out/png/bpmn-p4-subproceso.png)
+
+| Elemento | Descripción |
+| --- | --- |
+| Objetivo | Responder en plazo y con trazabilidad las solicitudes del titular sobre sus datos, tratándose de datos asociados a salud. |
+| Disparador | El participante quiere ejercer un derecho sobre sus datos. |
+| Actores | Participante, sistema FitGoal y responsable de operación (administrador). |
+| Resultado | Solicitud resuelta con comprobante, registro de la resolución y auditoría. |
+| Requerimientos | RF009, RF010, RNF002 |
+| Indicadores | Se propone medir el porcentaje de solicitudes respondidas dentro del plazo (se formaliza en la sección de KPI y SLA). |
+
+**Flujo.**
+
+1. El participante elige el tipo de derecho (acceso, rectificación, oposición, bloqueo, exportación o eliminación) y envía la solicitud.
+2. El sistema la registra, emite el comprobante y calcula el plazo: 30 días corridos, o 2 días hábiles para el bloqueo.
+3. El responsable de operación verifica la identidad y el alcance. Si quedan 5 días del plazo, evalúa la prórroga única de hasta 30 días.
+4. Si procede, ejecuta el derecho según su tipo (SP4.1); si no, responde con el fundamento del rechazo.
+5. El sistema registra la resolución, audita y avisa al titular, que recibe la respuesta y el comprobante.
+
+**Subprocesos.**
+
+| Subproceso | Qué hace | Trazabilidad |
+| --- | --- | --- |
+| SP4.1 Ejecución según el tipo de derecho | Acceso: copia de los datos. Rectificación: nueva versión del perfil conservando la anterior. Oposición: dejar de tratar para la finalidad opcional y registrar la revocación, con borrado de la estatura, el peso y el historial de peso. Bloqueo: suspender el tratamiento afectado dentro de 2 días hábiles. Exportación: archivo portable en JSON. Eliminación: eliminar o anonimizar y registrar la solicitud para reaplicarla tras restaurar copias. | RF009 |
+
+**Optimización.** El comprobante y el plazo se calculan automáticamente, el sistema alerta antes del vencimiento y la ejecución queda auditada. Las eliminaciones se registran para reaplicarse si se restaura una copia de respaldo.
+
+## Anexo B. Comportamiento
+
+![Estados del catálogo y de la rutina](diagramas/out/png/st-1-estados.png)
+
+![Secuencia del flujo crítico](diagramas/out/png/sq-1-secuencia.png)
+
+El diagrama de estados define dos ciclos de vida. El contenido del catálogo (ejercicios, rutinas y reglas) nace «draft», pasa a «approved» cuando lo aprueba el profesional competente y termina «retired» cuando se retira o se aprueba una versión nueva. La rutina del participante solo está «vigente» o «reemplazada». La secuencia muestra el flujo crítico completo: la aprobación previa del catálogo, el perfil y la recomendación, el inicio inmediato de la rutina y su consulta, con las transacciones que garantizan la consistencia entre aprobación, inicio de la rutina y auditoría.
