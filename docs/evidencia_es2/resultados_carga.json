@@ -1,0 +1,1393 @@
+{
+ "nota": "Resultados de prueba_carga_local.mjs. Locales: no representan al ambiente del piloto. La estación no estaba aislada de otros programas.",
+ "antes_de_las_correcciones_de_datos": [
+  {
+   "fecha": "2026-11-06T02:31:23.781Z",
+   "ambiente": {
+    "cpu": "Intel(R) Core(TM) i5-4690 CPU @ 3.50GHz",
+    "nucleos": 4,
+    "ramGB": 11.9,
+    "so": "Windows_NT 10.0.19045",
+    "node": "v24.19.0",
+    "base": "PGlite 0.5.8 en memoria, mismo proceso que la API y el generador de carga"
+   },
+   "humo": {
+    "bootMs": 5050.1,
+    "health": {
+     "ok": true,
+     "database": "up"
+    },
+    "sinToken": 401,
+    "loginInvalido": 401,
+    "cabeceras": "nosniff"
+   },
+   "escenarios": [
+    {
+     "vus": 10,
+     "iterations": 10,
+     "flujos": 100,
+     "errores": 0,
+     "tasaError": 0,
+     "segundos": 3.7,
+     "flujosPorSegundo": 26.9,
+     "flujoMs": {
+      "n": 100,
+      "p50": 366.3,
+      "p95": 386.5,
+      "p99": 388.8,
+      "max": 390.3
+     },
+     "recomendarMs": {
+      "n": 100,
+      "p50": 145.6,
+      "p95": 153.4,
+      "p99": 156.2,
+      "max": 162.1
+     },
+     "iniciarMs": {
+      "n": 100,
+      "p50": 226.1,
+      "p95": 242.2,
+      "p99": 246.1,
+      "max": 246.9
+     }
+    },
+    {
+     "vus": 25,
+     "iterations": 8,
+     "flujos": 200,
+     "errores": 0,
+     "tasaError": 0,
+     "segundos": 7.1,
+     "flujosPorSegundo": 28.1,
+     "flujoMs": {
+      "n": 200,
+      "p50": 879.2,
+      "p95": 915.7,
+      "p99": 916.6,
+      "max": 917.9
+     },
+     "recomendarMs": {
+      "n": 200,
+      "p50": 332.8,
+      "p95": 365.8,
+      "p99": 368.8,
+      "max": 369.5
+     },
+     "iniciarMs": {
+      "n": 200,
+      "p50": 549.9,
+      "p95": 569.6,
+      "p99": 574.2,
+      "max": 578.2
+     }
+    },
+    {
+     "vus": 50,
+     "iterations": 6,
+     "flujos": 300,
+     "errores": 0,
+     "tasaError": 0,
+     "segundos": 10.2,
+     "flujosPorSegundo": 29.4,
+     "flujoMs": {
+      "n": 300,
+      "p50": 1664.1,
+      "p95": 1827.8,
+      "p99": 1832.7,
+      "max": 1832.9
+     },
+     "recomendarMs": {
+      "n": 300,
+      "p50": 720.3,
+      "p95": 802.4,
+      "p99": 810.2,
+      "max": 812.3
+     },
+     "iniciarMs": {
+      "n": 300,
+      "p50": 935.8,
+      "p95": 1193.2,
+      "p99": 1210.9,
+      "max": 1212.6
+     }
+    },
+    {
+     "vus": 100,
+     "iterations": 5,
+     "flujos": 500,
+     "errores": 0,
+     "tasaError": 0,
+     "segundos": 17.1,
+     "flujosPorSegundo": 29.3,
+     "flujoMs": {
+      "n": 500,
+      "p50": 3276.4,
+      "p95": 3775.1,
+      "p99": 3803.3,
+      "max": 3803.4
+     },
+     "recomendarMs": {
+      "n": 500,
+      "p50": 1353.3,
+      "p95": 1707.1,
+      "p99": 1729.5,
+      "max": 1735.8
+     },
+     "iniciarMs": {
+      "n": 500,
+      "p50": 1918.8,
+      "p95": 2298.6,
+      "p99": 2439.6,
+      "max": 2445.8
+     }
+    }
+   ],
+   "rssMB": 747.9
+  },
+  {
+   "fecha": "2026-11-06T03:41:22.789Z",
+   "ambiente": {
+    "cpu": "Intel(R) Core(TM) i5-4690 CPU @ 3.50GHz",
+    "nucleos": 4,
+    "ramGB": 11.9,
+    "so": "Windows_NT 10.0.19045",
+    "node": "v24.19.0",
+    "base": "PGlite en memoria, mismo proceso que la API y el generador de carga"
+   },
+   "humo": {
+    "arranqueMs": 10277.6,
+    "health": {
+     "ok": true,
+     "database": "up"
+    },
+    "sinToken": 401,
+    "loginInvalido": 401
+   },
+   "escenarios": [
+    {
+     "clientes": 10,
+     "iteraciones": 10,
+     "flujos": 100,
+     "errores": 0,
+     "segundos": 6,
+     "flujosPorSegundo": 16.7,
+     "flujoMs": {
+      "n": 100,
+      "p50": 581.8,
+      "p95": 650.3,
+      "p99": 652,
+      "max": 654.1
+     },
+     "recomendarMs": {
+      "n": 100,
+      "p50": 217.3,
+      "p95": 243.8,
+      "p99": 246.4,
+      "max": 248
+     },
+     "iniciarMs": {
+      "n": 100,
+      "p50": 362.8,
+      "p95": 429.2,
+      "p99": 432.5,
+      "max": 433.7
+     }
+    },
+    {
+     "clientes": 25,
+     "iteraciones": 8,
+     "flujos": 200,
+     "errores": 0,
+     "segundos": 12.2,
+     "flujosPorSegundo": 16.4,
+     "flujoMs": {
+      "n": 200,
+      "p50": 1478,
+      "p95": 1951.5,
+      "p99": 1961.2,
+      "max": 2024.8
+     },
+     "recomendarMs": {
+      "n": 200,
+      "p50": 517.8,
+      "p95": 756.5,
+      "p99": 759.1,
+      "max": 799.6
+     },
+     "iniciarMs": {
+      "n": 200,
+      "p50": 962.2,
+      "p95": 1198.8,
+      "p99": 1229.8,
+      "max": 1231.4
+     }
+    },
+    {
+     "clientes": 50,
+     "iteraciones": 6,
+     "flujos": 300,
+     "errores": 0,
+     "segundos": 19.6,
+     "flujosPorSegundo": 15.3,
+     "flujoMs": {
+      "n": 300,
+      "p50": 2906.7,
+      "p95": 4361,
+      "p99": 4363.4,
+      "max": 4488.5
+     },
+     "recomendarMs": {
+      "n": 300,
+      "p50": 913.5,
+      "p95": 1693.7,
+      "p99": 1706,
+      "max": 1715.5
+     },
+     "iniciarMs": {
+      "n": 300,
+      "p50": 1945,
+      "p95": 3507.1,
+      "p99": 3514.5,
+      "max": 3583.5
+     }
+    },
+    {
+     "clientes": 100,
+     "iteraciones": 5,
+     "flujos": 500,
+     "errores": 0,
+     "segundos": 22.4,
+     "flujosPorSegundo": 22.3,
+     "flujoMs": {
+      "n": 500,
+      "p50": 3975.9,
+      "p95": 5785.6,
+      "p99": 5788.7,
+      "max": 5790.5
+     },
+     "recomendarMs": {
+      "n": 500,
+      "p50": 2030.9,
+      "p95": 2470.4,
+      "p99": 2477.2,
+      "max": 2611.4
+     },
+     "iniciarMs": {
+      "n": 500,
+      "p50": 2238.4,
+      "p95": 3534.5,
+      "p99": 3592,
+      "max": 3603.7
+     }
+    }
+   ]
+  },
+  {
+   "fecha": "2026-11-06T03:43:02.756Z",
+   "ambiente": {
+    "cpu": "Intel(R) Core(TM) i5-4690 CPU @ 3.50GHz",
+    "nucleos": 4,
+    "ramGB": 11.9,
+    "so": "Windows_NT 10.0.19045",
+    "node": "v24.19.0",
+    "base": "PGlite en memoria, mismo proceso que la API y el generador de carga"
+   },
+   "humo": {
+    "arranqueMs": 5062.2,
+    "health": {
+     "ok": true,
+     "database": "up"
+    },
+    "sinToken": 401,
+    "loginInvalido": 401
+   },
+   "escenarios": [
+    {
+     "clientes": 10,
+     "iteraciones": 10,
+     "flujos": 100,
+     "errores": 0,
+     "segundos": 4.7,
+     "flujosPorSegundo": 21.4,
+     "flujoMs": {
+      "n": 100,
+      "p50": 407.6,
+      "p95": 952.7,
+      "p99": 953.2,
+      "max": 962.4
+     },
+     "recomendarMs": {
+      "n": 100,
+      "p50": 164.8,
+      "p95": 266.6,
+      "p99": 271.5,
+      "max": 271.5
+     },
+     "iniciarMs": {
+      "n": 100,
+      "p50": 239,
+      "p95": 686.2,
+      "p99": 694.9,
+      "max": 752.5
+     }
+    },
+    {
+     "clientes": 25,
+     "iteraciones": 8,
+     "flujos": 200,
+     "errores": 0,
+     "segundos": 11,
+     "flujosPorSegundo": 18.1,
+     "flujoMs": {
+      "n": 200,
+      "p50": 978.9,
+      "p95": 3221.8,
+      "p99": 3516.2,
+      "max": 3516.4
+     },
+     "recomendarMs": {
+      "n": 200,
+      "p50": 364.3,
+      "p95": 2040.5,
+      "p99": 2119.4,
+      "max": 2124.1
+     },
+     "iniciarMs": {
+      "n": 200,
+      "p50": 622.7,
+      "p95": 1195.2,
+      "p99": 1395,
+      "max": 1397.5
+     }
+    },
+    {
+     "clientes": 50,
+     "iteraciones": 6,
+     "flujos": 300,
+     "errores": 0,
+     "segundos": 15.2,
+     "flujosPorSegundo": 19.8,
+     "flujoMs": {
+      "n": 300,
+      "p50": 2550.2,
+      "p95": 2968,
+      "p99": 2971.1,
+      "max": 2971.7
+     },
+     "recomendarMs": {
+      "n": 300,
+      "p50": 917.5,
+      "p95": 1147.4,
+      "p99": 1188.6,
+      "max": 1200.2
+     },
+     "iniciarMs": {
+      "n": 300,
+      "p50": 1543.1,
+      "p95": 2072.3,
+      "p99": 2085.5,
+      "max": 2087.5
+     }
+    },
+    {
+     "clientes": 100,
+     "iteraciones": 5,
+     "flujos": 500,
+     "errores": 0,
+     "segundos": 18.7,
+     "flujosPorSegundo": 26.7,
+     "flujoMs": {
+      "n": 500,
+      "p50": 3641.3,
+      "p95": 3957.2,
+      "p99": 4016,
+      "max": 4019.2
+     },
+     "recomendarMs": {
+      "n": 500,
+      "p50": 1612.3,
+      "p95": 1892.9,
+      "p99": 1909.7,
+      "max": 1914.1
+     },
+     "iniciarMs": {
+      "n": 500,
+      "p50": 2010.4,
+      "p95": 2586.8,
+      "p99": 2644.7,
+      "max": 2651.6
+     }
+    }
+   ]
+  },
+  {
+   "fecha": "2026-11-06T03:44:05.937Z",
+   "ambiente": {
+    "cpu": "Intel(R) Core(TM) i5-4690 CPU @ 3.50GHz",
+    "nucleos": 4,
+    "ramGB": 11.9,
+    "so": "Windows_NT 10.0.19045",
+    "node": "v24.19.0",
+    "base": "PGlite en memoria, mismo proceso que la API y el generador de carga"
+   },
+   "humo": {
+    "arranqueMs": 4719.6,
+    "health": {
+     "ok": true,
+     "database": "up"
+    },
+    "sinToken": 401,
+    "loginInvalido": 401
+   },
+   "escenarios": [
+    {
+     "clientes": 10,
+     "iteraciones": 10,
+     "flujos": 100,
+     "errores": 0,
+     "segundos": 4.4,
+     "flujosPorSegundo": 23,
+     "flujoMs": {
+      "n": 100,
+      "p50": 413,
+      "p95": 618.5,
+      "p99": 619.8,
+      "max": 620.4
+     },
+     "recomendarMs": {
+      "n": 100,
+      "p50": 152,
+      "p95": 255,
+      "p99": 278.3,
+      "max": 279.2
+     },
+     "iniciarMs": {
+      "n": 100,
+      "p50": 261.8,
+      "p95": 348.7,
+      "p99": 368.3,
+      "max": 369.9
+     }
+    },
+    {
+     "clientes": 25,
+     "iteraciones": 8,
+     "flujos": 200,
+     "errores": 0,
+     "segundos": 8.1,
+     "flujosPorSegundo": 24.7,
+     "flujoMs": {
+      "n": 200,
+      "p50": 930.2,
+      "p95": 1384.7,
+      "p99": 1388.9,
+      "max": 1389.3
+     },
+     "recomendarMs": {
+      "n": 200,
+      "p50": 347.6,
+      "p95": 553,
+      "p99": 558.4,
+      "max": 559.7
+     },
+     "iniciarMs": {
+      "n": 200,
+      "p50": 566.5,
+      "p95": 1001.2,
+      "p99": 1019.1,
+      "max": 1023.2
+     }
+    },
+    {
+     "clientes": 50,
+     "iteraciones": 6,
+     "flujos": 300,
+     "errores": 0,
+     "segundos": 13.6,
+     "flujosPorSegundo": 22,
+     "flujoMs": {
+      "n": 300,
+      "p50": 2097.8,
+      "p95": 3066.5,
+      "p99": 3297.5,
+      "max": 3298.5
+     },
+     "recomendarMs": {
+      "n": 300,
+      "p50": 906.7,
+      "p95": 1048.7,
+      "p99": 1394.5,
+      "max": 1399.8
+     },
+     "iniciarMs": {
+      "n": 300,
+      "p50": 1206.7,
+      "p95": 2115.1,
+      "p99": 2129.3,
+      "max": 2132.1
+     }
+    },
+    {
+     "clientes": 100,
+     "iteraciones": 5,
+     "flujos": 500,
+     "errores": 0,
+     "segundos": 18.9,
+     "flujosPorSegundo": 26.5,
+     "flujoMs": {
+      "n": 500,
+      "p50": 3688.6,
+      "p95": 3978.4,
+      "p99": 3992.2,
+      "max": 3994.4
+     },
+     "recomendarMs": {
+      "n": 500,
+      "p50": 1602.2,
+      "p95": 1984.4,
+      "p99": 1997.8,
+      "max": 2001
+     },
+     "iniciarMs": {
+      "n": 500,
+      "p50": 2015.8,
+      "p95": 2456.2,
+      "p99": 2503.1,
+      "max": 2509.3
+     }
+    }
+   ]
+  },
+  {
+   "fecha": "2026-11-06T03:45:03.310Z",
+   "ambiente": {
+    "cpu": "Intel(R) Core(TM) i5-4690 CPU @ 3.50GHz",
+    "nucleos": 4,
+    "ramGB": 11.9,
+    "so": "Windows_NT 10.0.19045",
+    "node": "v24.19.0",
+    "base": "PGlite en memoria, mismo proceso que la API y el generador de carga"
+   },
+   "humo": {
+    "arranqueMs": 5096.6,
+    "health": {
+     "ok": true,
+     "database": "up"
+    },
+    "sinToken": 401,
+    "loginInvalido": 401
+   },
+   "escenarios": [
+    {
+     "clientes": 10,
+     "iteraciones": 10,
+     "flujos": 100,
+     "errores": 0,
+     "segundos": 4.1,
+     "flujosPorSegundo": 24.3,
+     "flujoMs": {
+      "n": 100,
+      "p50": 405.4,
+      "p95": 436.9,
+      "p99": 488.8,
+      "max": 488.8
+     },
+     "recomendarMs": {
+      "n": 100,
+      "p50": 165.2,
+      "p95": 201.5,
+      "p99": 211.9,
+      "max": 213.5
+     },
+     "iniciarMs": {
+      "n": 100,
+      "p50": 233.1,
+      "p95": 281.5,
+      "p99": 349.5,
+      "max": 350.2
+     }
+    },
+    {
+     "clientes": 25,
+     "iteraciones": 8,
+     "flujos": 200,
+     "errores": 0,
+     "segundos": 7.8,
+     "flujosPorSegundo": 25.5,
+     "flujoMs": {
+      "n": 200,
+      "p50": 965,
+      "p95": 1066.2,
+      "p99": 1067.8,
+      "max": 1068
+     },
+     "recomendarMs": {
+      "n": 200,
+      "p50": 353.7,
+      "p95": 390.6,
+      "p99": 394.1,
+      "max": 395.2
+     },
+     "iniciarMs": {
+      "n": 200,
+      "p50": 614.5,
+      "p95": 676,
+      "p99": 681.8,
+      "max": 683.4
+     }
+    },
+    {
+     "clientes": 50,
+     "iteraciones": 6,
+     "flujos": 300,
+     "errores": 0,
+     "segundos": 11.7,
+     "flujosPorSegundo": 25.6,
+     "flujoMs": {
+      "n": 300,
+      "p50": 1934,
+      "p95": 2134.5,
+      "p99": 2135.3,
+      "max": 2135.7
+     },
+     "recomendarMs": {
+      "n": 300,
+      "p50": 817.6,
+      "p95": 911.5,
+      "p99": 918.9,
+      "max": 924.2
+     },
+     "iniciarMs": {
+      "n": 300,
+      "p50": 1158.6,
+      "p95": 1362.6,
+      "p99": 1372.9,
+      "max": 1377.3
+     }
+    },
+    {
+     "clientes": 100,
+     "iteraciones": 5,
+     "flujos": 500,
+     "errores": 0,
+     "segundos": 19.5,
+     "flujosPorSegundo": 25.7,
+     "flujoMs": {
+      "n": 500,
+      "p50": 3794.6,
+      "p95": 4657.6,
+      "p99": 4668.9,
+      "max": 4673.3
+     },
+     "recomendarMs": {
+      "n": 500,
+      "p50": 1526.3,
+      "p95": 1941.3,
+      "p99": 1958.4,
+      "max": 1962.6
+     },
+     "iniciarMs": {
+      "n": 500,
+      "p50": 2242.4,
+      "p95": 2758.3,
+      "p99": 2789.3,
+      "max": 2792.3
+     }
+    }
+   ]
+  }
+ ],
+ "codigo_actual": [
+  {
+   "fecha": "2026-11-06T04:06:01.871Z",
+   "ambiente": {
+    "cpu": "Intel(R) Core(TM) i5-4690 CPU @ 3.50GHz",
+    "nucleos": 4,
+    "ramGB": 11.9,
+    "so": "Windows_NT 10.0.19045",
+    "node": "v24.19.0",
+    "base": "PGlite en memoria, mismo proceso que la API y el generador de carga"
+   },
+   "humo": {
+    "arranqueMs": 4922.9,
+    "health": {
+     "ok": true,
+     "database": "up"
+    },
+    "sinToken": 401,
+    "loginInvalido": 401
+   },
+   "escenarios": [
+    {
+     "clientes": 10,
+     "iteraciones": 10,
+     "flujos": 100,
+     "errores": 0,
+     "segundos": 3.4,
+     "flujosPorSegundo": 29.2,
+     "flujoMs": {
+      "n": 100,
+      "p50": 341.6,
+      "p95": 355.9,
+      "p99": 356.1,
+      "max": 356.1
+     },
+     "recomendarMs": {
+      "n": 100,
+      "p50": 141.4,
+      "p95": 152.8,
+      "p99": 154.2,
+      "max": 154.6
+     },
+     "iniciarMs": {
+      "n": 100,
+      "p50": 201.5,
+      "p95": 228.7,
+      "p99": 230,
+      "max": 230.7
+     }
+    },
+    {
+     "clientes": 25,
+     "iteraciones": 8,
+     "flujos": 200,
+     "errores": 0,
+     "segundos": 6.5,
+     "flujosPorSegundo": 30.6,
+     "flujoMs": {
+      "n": 200,
+      "p50": 815,
+      "p95": 883.4,
+      "p99": 883.5,
+      "max": 884.3
+     },
+     "recomendarMs": {
+      "n": 200,
+      "p50": 298.8,
+      "p95": 336.8,
+      "p99": 341.4,
+      "max": 342.8
+     },
+     "iniciarMs": {
+      "n": 200,
+      "p50": 514.7,
+      "p95": 573.3,
+      "p99": 579.3,
+      "max": 581
+     }
+    },
+    {
+     "clientes": 50,
+     "iteraciones": 6,
+     "flujos": 300,
+     "errores": 0,
+     "segundos": 9.7,
+     "flujosPorSegundo": 30.8,
+     "flujoMs": {
+      "n": 300,
+      "p50": 1591.8,
+      "p95": 1723.3,
+      "p99": 1724.1,
+      "max": 1724.3
+     },
+     "recomendarMs": {
+      "n": 300,
+      "p50": 640.3,
+      "p95": 678.7,
+      "p99": 690.6,
+      "max": 693
+     },
+     "iniciarMs": {
+      "n": 300,
+      "p50": 954.8,
+      "p95": 1097,
+      "p99": 1101,
+      "max": 1103
+     }
+    },
+    {
+     "clientes": 100,
+     "iteraciones": 5,
+     "flujos": 500,
+     "errores": 0,
+     "segundos": 15.7,
+     "flujosPorSegundo": 31.9,
+     "flujoMs": {
+      "n": 500,
+      "p50": 3119.1,
+      "p95": 3197.6,
+      "p99": 3197.7,
+      "max": 3198.9
+     },
+     "recomendarMs": {
+      "n": 500,
+      "p50": 1304,
+      "p95": 1618.7,
+      "p99": 1652.2,
+      "max": 1655.7
+     },
+     "iniciarMs": {
+      "n": 500,
+      "p50": 1793,
+      "p95": 2035.8,
+      "p99": 2043.4,
+      "max": 2057.2
+     }
+    }
+   ]
+  },
+  {
+   "fecha": "2026-11-06T04:06:50.008Z",
+   "ambiente": {
+    "cpu": "Intel(R) Core(TM) i5-4690 CPU @ 3.50GHz",
+    "nucleos": 4,
+    "ramGB": 11.9,
+    "so": "Windows_NT 10.0.19045",
+    "node": "v24.19.0",
+    "base": "PGlite en memoria, mismo proceso que la API y el generador de carga"
+   },
+   "humo": {
+    "arranqueMs": 4505.4,
+    "health": {
+     "ok": true,
+     "database": "up"
+    },
+    "sinToken": 401,
+    "loginInvalido": 401
+   },
+   "escenarios": [
+    {
+     "clientes": 10,
+     "iteraciones": 10,
+     "flujos": 100,
+     "errores": 0,
+     "segundos": 4.5,
+     "flujosPorSegundo": 22.4,
+     "flujoMs": {
+      "n": 100,
+      "p50": 434.8,
+      "p95": 522.6,
+      "p99": 538.4,
+      "max": 538.4
+     },
+     "recomendarMs": {
+      "n": 100,
+      "p50": 164.9,
+      "p95": 234.9,
+      "p99": 265.1,
+      "max": 265.5
+     },
+     "iniciarMs": {
+      "n": 100,
+      "p50": 261.5,
+      "p95": 358,
+      "p99": 359.5,
+      "max": 359.8
+     }
+    },
+    {
+     "clientes": 25,
+     "iteraciones": 8,
+     "flujos": 200,
+     "errores": 0,
+     "segundos": 8.6,
+     "flujosPorSegundo": 23.2,
+     "flujoMs": {
+      "n": 200,
+      "p50": 997,
+      "p95": 1296.5,
+      "p99": 1306.3,
+      "max": 1307.7
+     },
+     "recomendarMs": {
+      "n": 200,
+      "p50": 388,
+      "p95": 466.7,
+      "p99": 475.8,
+      "max": 476.3
+     },
+     "iniciarMs": {
+      "n": 200,
+      "p50": 642,
+      "p95": 852.8,
+      "p99": 858.7,
+      "max": 860.7
+     }
+    },
+    {
+     "clientes": 50,
+     "iteraciones": 6,
+     "flujos": 300,
+     "errores": 0,
+     "segundos": 13,
+     "flujosPorSegundo": 23.2,
+     "flujoMs": {
+      "n": 300,
+      "p50": 2017,
+      "p95": 3010.1,
+      "p99": 3013.3,
+      "max": 3013.7
+     },
+     "recomendarMs": {
+      "n": 300,
+      "p50": 730.4,
+      "p95": 1269.1,
+      "p99": 1281.8,
+      "max": 1283.4
+     },
+     "iniciarMs": {
+      "n": 300,
+      "p50": 1246.6,
+      "p95": 2158.1,
+      "p99": 2193,
+      "max": 2197.3
+     }
+    },
+    {
+     "clientes": 100,
+     "iteraciones": 5,
+     "flujos": 500,
+     "errores": 0,
+     "segundos": 20.2,
+     "flujosPorSegundo": 24.7,
+     "flujoMs": {
+      "n": 500,
+      "p50": 3755.6,
+      "p95": 4488.2,
+      "p99": 4694.9,
+      "max": 4699.9
+     },
+     "recomendarMs": {
+      "n": 500,
+      "p50": 1602.4,
+      "p95": 2020.8,
+      "p99": 2034.4,
+      "max": 2037.8
+     },
+     "iniciarMs": {
+      "n": 500,
+      "p50": 2356.6,
+      "p95": 2853.7,
+      "p99": 2968.1,
+      "max": 2974.2
+     }
+    }
+   ]
+  },
+  {
+   "fecha": "2026-11-06T04:07:51.475Z",
+   "ambiente": {
+    "cpu": "Intel(R) Core(TM) i5-4690 CPU @ 3.50GHz",
+    "nucleos": 4,
+    "ramGB": 11.9,
+    "so": "Windows_NT 10.0.19045",
+    "node": "v24.19.0",
+    "base": "PGlite en memoria, mismo proceso que la API y el generador de carga"
+   },
+   "humo": {
+    "arranqueMs": 4920.7,
+    "health": {
+     "ok": true,
+     "database": "up"
+    },
+    "sinToken": 401,
+    "loginInvalido": 401
+   },
+   "escenarios": [
+    {
+     "clientes": 10,
+     "iteraciones": 10,
+     "flujos": 100,
+     "errores": 0,
+     "segundos": 4,
+     "flujosPorSegundo": 25.1,
+     "flujoMs": {
+      "n": 100,
+      "p50": 390.7,
+      "p95": 526.2,
+      "p99": 540,
+      "max": 540
+     },
+     "recomendarMs": {
+      "n": 100,
+      "p50": 153,
+      "p95": 220.4,
+      "p99": 225.3,
+      "max": 227.1
+     },
+     "iniciarMs": {
+      "n": 100,
+      "p50": 237,
+      "p95": 312.9,
+      "p99": 317.8,
+      "max": 337.7
+     }
+    },
+    {
+     "clientes": 25,
+     "iteraciones": 8,
+     "flujos": 200,
+     "errores": 0,
+     "segundos": 7.8,
+     "flujosPorSegundo": 25.8,
+     "flujoMs": {
+      "n": 200,
+      "p50": 968.1,
+      "p95": 1108.6,
+      "p99": 1108.7,
+      "max": 1108.8
+     },
+     "recomendarMs": {
+      "n": 200,
+      "p50": 330.2,
+      "p95": 490.3,
+      "p99": 496.1,
+      "max": 497.3
+     },
+     "iniciarMs": {
+      "n": 200,
+      "p50": 617.5,
+      "p95": 663,
+      "p99": 673.6,
+      "max": 676.2
+     }
+    },
+    {
+     "clientes": 50,
+     "iteraciones": 6,
+     "flujos": 300,
+     "errores": 0,
+     "segundos": 16.5,
+     "flujosPorSegundo": 18.1,
+     "flujoMs": {
+      "n": 300,
+      "p50": 2581.7,
+      "p95": 3799.5,
+      "p99": 3799.9,
+      "max": 3800
+     },
+     "recomendarMs": {
+      "n": 300,
+      "p50": 1025.6,
+      "p95": 1611.6,
+      "p99": 1621,
+      "max": 1626.7
+     },
+     "iniciarMs": {
+      "n": 300,
+      "p50": 1504.2,
+      "p95": 2956.9,
+      "p99": 2964.1,
+      "max": 2965.4
+     }
+    },
+    {
+     "clientes": 100,
+     "iteraciones": 5,
+     "flujos": 500,
+     "errores": 0,
+     "segundos": 19.5,
+     "flujosPorSegundo": 25.6,
+     "flujoMs": {
+      "n": 500,
+      "p50": 3772.7,
+      "p95": 4271.5,
+      "p99": 4338.4,
+      "max": 4338.5
+     },
+     "recomendarMs": {
+      "n": 500,
+      "p50": 1665.4,
+      "p95": 2288.5,
+      "p99": 2318.4,
+      "max": 2321.4
+     },
+     "iniciarMs": {
+      "n": 500,
+      "p50": 2020.4,
+      "p95": 2610.4,
+      "p99": 2837,
+      "max": 2838.5
+     }
+    }
+   ]
+  },
+  {
+   "fecha": "2026-11-06T04:08:53.050Z",
+   "ambiente": {
+    "cpu": "Intel(R) Core(TM) i5-4690 CPU @ 3.50GHz",
+    "nucleos": 4,
+    "ramGB": 11.9,
+    "so": "Windows_NT 10.0.19045",
+    "node": "v24.19.0",
+    "base": "PGlite en memoria, mismo proceso que la API y el generador de carga"
+   },
+   "humo": {
+    "arranqueMs": 5160.9,
+    "health": {
+     "ok": true,
+     "database": "up"
+    },
+    "sinToken": 401,
+    "loginInvalido": 401
+   },
+   "escenarios": [
+    {
+     "clientes": 10,
+     "iteraciones": 10,
+     "flujos": 100,
+     "errores": 0,
+     "segundos": 4.2,
+     "flujosPorSegundo": 23.9,
+     "flujoMs": {
+      "n": 100,
+      "p50": 399.7,
+      "p95": 479.6,
+      "p99": 479.9,
+      "max": 481.7
+     },
+     "recomendarMs": {
+      "n": 100,
+      "p50": 154.1,
+      "p95": 209.7,
+      "p99": 212.8,
+      "max": 213.6
+     },
+     "iniciarMs": {
+      "n": 100,
+      "p50": 251,
+      "p95": 302.3,
+      "p99": 324.7,
+      "max": 340.8
+     }
+    },
+    {
+     "clientes": 25,
+     "iteraciones": 8,
+     "flujos": 200,
+     "errores": 0,
+     "segundos": 8,
+     "flujosPorSegundo": 24.9,
+     "flujoMs": {
+      "n": 200,
+      "p50": 985.6,
+      "p95": 1080.6,
+      "p99": 1084.3,
+      "max": 1095.6
+     },
+     "recomendarMs": {
+      "n": 200,
+      "p50": 358.3,
+      "p95": 409.5,
+      "p99": 416.5,
+      "max": 418.5
+     },
+     "iniciarMs": {
+      "n": 200,
+      "p50": 627,
+      "p95": 707.1,
+      "p99": 719.9,
+      "max": 726.2
+     }
+    },
+    {
+     "clientes": 50,
+     "iteraciones": 6,
+     "flujos": 300,
+     "errores": 0,
+     "segundos": 11.5,
+     "flujosPorSegundo": 26,
+     "flujoMs": {
+      "n": 300,
+      "p50": 1920,
+      "p95": 1969.3,
+      "p99": 1969.4,
+      "max": 1969.4
+     },
+     "recomendarMs": {
+      "n": 300,
+      "p50": 691.1,
+      "p95": 938.2,
+      "p99": 949,
+      "max": 951
+     },
+     "iniciarMs": {
+      "n": 300,
+      "p50": 1070.2,
+      "p95": 1288.2,
+      "p99": 1295.9,
+      "max": 1298
+     }
+    },
+    {
+     "clientes": 100,
+     "iteraciones": 5,
+     "flujos": 500,
+     "errores": 0,
+     "segundos": 19,
+     "flujosPorSegundo": 26.2,
+     "flujoMs": {
+      "n": 500,
+      "p50": 3755.7,
+      "p95": 4748.9,
+      "p99": 4761.3,
+      "max": 4766.2
+     },
+     "recomendarMs": {
+      "n": 500,
+      "p50": 1423.1,
+      "p95": 1982.4,
+      "p99": 1999.6,
+      "max": 2003.8
+     },
+     "iniciarMs": {
+      "n": 500,
+      "p50": 2333,
+      "p95": 2914.9,
+      "p99": 2943.4,
+      "max": 2951.5
+     }
+    }
+   ]
+  },
+  {
+   "fecha": "2026-11-06T04:09:49.812Z",
+   "ambiente": {
+    "cpu": "Intel(R) Core(TM) i5-4690 CPU @ 3.50GHz",
+    "nucleos": 4,
+    "ramGB": 11.9,
+    "so": "Windows_NT 10.0.19045",
+    "node": "v24.19.0",
+    "base": "PGlite en memoria, mismo proceso que la API y el generador de carga"
+   },
+   "humo": {
+    "arranqueMs": 5128.7,
+    "health": {
+     "ok": true,
+     "database": "up"
+    },
+    "sinToken": 401,
+    "loginInvalido": 401
+   },
+   "escenarios": [
+    {
+     "clientes": 10,
+     "iteraciones": 10,
+     "flujos": 100,
+     "errores": 0,
+     "segundos": 4.1,
+     "flujosPorSegundo": 24.3,
+     "flujoMs": {
+      "n": 100,
+      "p50": 406.1,
+      "p95": 426.2,
+      "p99": 432.5,
+      "max": 433.4
+     },
+     "recomendarMs": {
+      "n": 100,
+      "p50": 170.3,
+      "p95": 188.5,
+      "p99": 190.6,
+      "max": 191.3
+     },
+     "iniciarMs": {
+      "n": 100,
+      "p50": 241.7,
+      "p95": 264.9,
+      "p99": 271.6,
+      "max": 271.8
+     }
+    },
+    {
+     "clientes": 25,
+     "iteraciones": 8,
+     "flujos": 200,
+     "errores": 0,
+     "segundos": 7.8,
+     "flujosPorSegundo": 25.7,
+     "flujoMs": {
+      "n": 200,
+      "p50": 956.4,
+      "p95": 1037.3,
+      "p99": 1037.8,
+      "max": 1039.7
+     },
+     "recomendarMs": {
+      "n": 200,
+      "p50": 335.9,
+      "p95": 393,
+      "p99": 583.9,
+      "max": 587.9
+     },
+     "iniciarMs": {
+      "n": 200,
+      "p50": 632.1,
+      "p95": 656.4,
+      "p99": 660.7,
+      "max": 669.7
+     }
+    },
+    {
+     "clientes": 50,
+     "iteraciones": 6,
+     "flujos": 300,
+     "errores": 0,
+     "segundos": 13.1,
+     "flujosPorSegundo": 23,
+     "flujoMs": {
+      "n": 300,
+      "p50": 2025,
+      "p95": 2609.1,
+      "p99": 2609.4,
+      "max": 2609.9
+     },
+     "recomendarMs": {
+      "n": 300,
+      "p50": 863.6,
+      "p95": 1378.6,
+      "p99": 1384.3,
+      "max": 1386
+     },
+     "iniciarMs": {
+      "n": 300,
+      "p50": 1245,
+      "p95": 1739.7,
+      "p99": 1747.6,
+      "max": 1749.1
+     }
+    },
+    {
+     "clientes": 100,
+     "iteraciones": 5,
+     "flujos": 500,
+     "errores": 0,
+     "segundos": 18.8,
+     "flujosPorSegundo": 26.6,
+     "flujoMs": {
+      "n": 500,
+      "p50": 3695.8,
+      "p95": 3916.2,
+      "p99": 3916.6,
+      "max": 3924.9
+     },
+     "recomendarMs": {
+      "n": 500,
+      "p50": 1468.9,
+      "p95": 1861.9,
+      "p99": 1872.2,
+      "max": 1875.1
+     },
+     "iniciarMs": {
+      "n": 500,
+      "p50": 2061,
+      "p95": 2456.5,
+      "p99": 2522.9,
+      "max": 2645.8
+     }
+    }
+   ]
+  }
+ ]
+}
