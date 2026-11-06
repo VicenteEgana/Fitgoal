@@ -73,7 +73,7 @@ describe('Administración, auditoría e indicadores (RF010, K1, K3, K5)', () => 
 
   test('K3: la adherencia de la cohorte inscrita cuenta como no realizada la sesión sin registro', async () => {
     const { participant } = await participantWithPlan(ctx);
-    await ctx.db.query('UPDATE users SET enrolled_at = $2 WHERE id = $1', [participant.user.id, ctx.clock.current]);
+    await ctx.db.query("UPDATE users SET enrolled_at = CASE WHEN id = $1 THEN $2::timestamptz END WHERE role = 'user'", [participant.user.id, ctx.clock.current]);
     const baseline = (await admin.get('/api/admin/kpis')).body.kpis.K3;
     const sessions = (await participant.api.get('/api/sessions/me?to=2026-12-31')).body.sessions;
     ctx.advanceDays(8);

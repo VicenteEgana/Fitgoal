@@ -2,7 +2,7 @@
 // consentimiento, adherencia, racha y avisos internos.
 import { Router } from 'express';
 import { fail } from '../lib/errors.js';
-import { audit, hasConsent, usageEvent } from '../lib/records.js';
+import { audit, hasConsent, participantEvent } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
 import { DAY_LABELS, addDays, isoWeekday, localDate, weekStart } from '../lib/time.js';
 import { isIsoDate, uuidParam } from '../lib/validate.js';
@@ -191,14 +191,14 @@ export function progressRouter(ctx) {
       let weightRejected = null;
       if (!session.completed_at) {
         await tx.query('UPDATE training_sessions SET completed_at = $2, note = $3 WHERE id = $1', [id, now(), note?.trim() || null]);
-        await usageEvent(tx, config, now(), req.auth.userId, 'sesion_registrada');
+        await participantEvent(tx, config, now(), req.auth.userId, 'sesion_registrada');
       }
       if (weightKg !== undefined && weightKg !== null) {
         const gate = await weightAllowed(tx, req.auth);
         if (!gate.allowed) weightRejected = gate.reason;
         else {
           await tx.query('INSERT INTO weight_records (user_id, recorded_on, weight_kg) VALUES ($1, $2, $3) ON CONFLICT (user_id, recorded_on) DO UPDATE SET weight_kg = EXCLUDED.weight_kg', [req.auth.userId, today(), weightKg]);
-          await usageEvent(tx, config, now(), req.auth.userId, 'peso_registrado');
+          await participantEvent(tx, config, now(), req.auth.userId, 'peso_registrado');
         }
       }
       const updated = (await tx.query('SELECT s.*, p.status AS plan_status FROM training_sessions s JOIN user_plans p ON p.id = s.plan_id WHERE s.id = $1', [id])).rows[0];
@@ -223,7 +223,7 @@ export function progressRouter(ctx) {
       const gate = await weightAllowed(tx, req.auth);
       if (!gate.allowed) fail(403, 'WEIGHT_NOT_ENABLED', gate.reason);
       await tx.query('INSERT INTO weight_records (user_id, recorded_on, weight_kg) VALUES ($1, $2, $3) ON CONFLICT (user_id, recorded_on) DO UPDATE SET weight_kg = EXCLUDED.weight_kg', [req.auth.userId, date, weightKg]);
-      await usageEvent(tx, config, now(), req.auth.userId, 'peso_registrado');
+      await participantEvent(tx, config, now(), req.auth.userId, 'peso_registrado');
     });
     res.status(201).json({ recordedOn: date, weightKg });
   });

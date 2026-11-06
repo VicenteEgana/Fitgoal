@@ -28,7 +28,7 @@ const server = app.listen(config.port, config.host, () => {
 });
 
 const scheduler = setInterval(() => runMaintenance(app.context).then(result => {
-  if (result.sessionReminders) console.log(`Mantenimiento: ${JSON.stringify(result)}`);
+  if (Object.values(result).some(Boolean)) console.log(`Mantenimiento: ${JSON.stringify(result)}`);
 }).catch(error => console.error('Mantenimiento falló:', error.message)), 60 * 60 * 1000);
 scheduler.unref();
 

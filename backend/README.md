@@ -34,7 +34,7 @@ Sin `DATABASE_URL`, la API usa **PGlite** (PostgreSQL 18.3 compilado a WASM) en 
 - Cabeceras de seguridad, JSON limitado a 100 kB, `Cache-Control: no-store` en `/api`.
 - Roles `user`, `trainer`, `nutritionist`, `admin`. La competencia se impone en la base de datos mediante claves foráneas compuestas (solo el preparador aprueba ejercicios, rutinas y reglas de entrenamiento; solo la nutricionista, los alimentos, las pautas de alimentación y las reglas nutricionales).
 - **Solo lo aprobado llega a las personas.** Un disparador impide iniciar una plantilla o usar un ejercicio que no esté aprobado, y congela las rutinas iniciadas y las versiones aprobadas. `audit_log` es de solo inserción.
-- La **estatura y el peso** son datos de salud: solo se guardan con el consentimiento específico `datos_corporales`, y se borran de todas las versiones del perfil si se revoca o si se ejerce la oposición. El IMC se calcula en el servidor y nunca se almacena.
+- La **estatura y el peso** son datos de salud: solo se guardan con el consentimiento específico `datos_corporales`, y se borran de todas las versiones del perfil, junto con el historial de peso, si se revoca o si se ejerce la oposición. El IMC se calcula en el servidor y nunca se almacena.
 - Datos de estimación energética (sexo, peso, talla, actividad) únicamente en perfiles ficticios, exigido por una restricción `CHECK`.
 - Eventos de uso seudonimizados con HMAC, sin clave foránea a la persona.
 
@@ -50,7 +50,7 @@ Sin `DATABASE_URL`, la API usa **PGlite** (PostgreSQL 18.3 compilado a WASM) en 
 | `progress` | Horario semanal con días de descanso, sesiones, registro, peso, adherencia, racha (con comodín semanal; `src/lib/streak.js`) y avisos. |
 | `estimates` | Estimación energética (Mifflin-St Jeor), solo perfiles ficticios. |
 | `datarights` | Solicitudes de acceso, rectificación, eliminación, bloqueo y portabilidad con plazos y prórroga. |
-| `admin` | Cuentas, auditoría, indicadores K1, K2, K3 y K5 y mantenimiento (recordatorios de sesiones). |
+| `admin` | Cuentas, auditoría, indicadores K1, K2, K3 y K5 y mantenimiento (recordatorios de sesiones y plazos de conservación de `docs/politica_de_datos.md`). |
 
 El servidor ejecuta el mantenimiento cada hora; `POST /api/admin/maintenance/run` lo dispara a mano.
 

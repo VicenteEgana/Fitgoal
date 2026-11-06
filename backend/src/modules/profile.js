@@ -1,7 +1,7 @@
 // Perfil versionado y consentimientos. Cada cambio del perfil crea una versión nueva.
 import { Router } from 'express';
 import { fail } from '../lib/errors.js';
-import { audit, consentState, consentTime, currentProfile, hasConsent, profileView } from '../lib/records.js';
+import { audit, consentState, consentTime, currentProfile, eraseForPurpose, hasConsent, profileView } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
 
 export const OBJECTIVES = ['bajar', 'mantener', 'subir'];
@@ -94,9 +94,9 @@ export function profileRouter(ctx) {
     if (req.body.policyVersion !== config.policyVersion) fail(400, 'POLICY_VERSION_MISMATCH', 'La política de datos mostrada no es la vigente.');
     await db.transaction(async tx => {
       await tx.query('INSERT INTO consents (user_id, purpose, policy_version, granted, recorded_at) VALUES ($1, $2, $3, $4, $5)', [req.auth.userId, purpose, config.policyVersion, granted, await consentTime(tx, req.auth.userId, purpose, now())]);
-      // Minimización: al revocar el consentimiento de los datos corporales se borran de todas las versiones del perfil.
-      if (purpose === 'datos_corporales' && !granted) await tx.query('UPDATE profile_versions SET weight_kg = NULL, height_cm = NULL, sex_param = NULL, activity_level = NULL WHERE user_id = $1', [req.auth.userId]);
-      if (purpose === 'datos_nutricionales' && !granted) await tx.query('UPDATE profile_versions SET sex_param = NULL, activity_level = NULL WHERE user_id = $1', [req.auth.userId]);
+      if (!granted) await eraseForPurpose(tx, config, req.auth.userId, purpose);
+      // Autorizar la evaluación inscribe a la persona en el piloto: es el denominador de K2 y K3.
+      if (granted && purpose === 'evaluacion_piloto') await tx.query('UPDATE users SET enrolled_at = COALESCE(enrolled_at, $2) WHERE id = $1', [req.auth.userId, now()]);
       await audit(tx, now(), { actor: req.auth, action: granted ? 'consent.granted' : 'consent.revoked', entityType: 'consent', detail: { purpose } });
     });
     res.status(201).json({ purpose, granted, policyVersion: config.policyVersion });

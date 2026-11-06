@@ -45,7 +45,7 @@ export async function createContext({ seed = true, config: overrides = {}, limit
     const email = extra.email ?? ctx.email('participante');
     const response = await http.post('/api/auth/register').send({
       email, password: PASSWORD, policyVersion: POLICY, fictitious: true,
-      consents: { registro_cuenta: true, perfil_entrenamiento: true, datos_corporales: true, seguimiento_progreso: true, recordatorios: true }, ...extra,
+      consents: { registro_cuenta: true, perfil_entrenamiento: true, datos_corporales: true, seguimiento_progreso: true, recordatorios: true, evaluacion_piloto: true }, ...extra,
     });
     if (response.status !== 201) throw new Error(`registro falló (${response.status}): ${JSON.stringify(response.body)}`);
     return { ...response.body, email, api: ctx.as(response.body.accessToken) };

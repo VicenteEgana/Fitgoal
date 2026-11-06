@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import { fail } from '../lib/errors.js';
-import { audit, consentState, consentTime, notify, notifyAdmins, profileView } from '../lib/records.js';
+import { audit, consentState, consentTime, eraseForPurpose, notify, notifyAdmins, profileView } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
 import { pseudonymOf } from '../lib/security.js';
 import { addBusinessDays, localDate } from '../lib/time.js';
@@ -125,8 +125,10 @@ export function dataRightsRouter(ctx) {
       if (outcome === 'resuelta') {
         const when = now();
         if (request.request_type === 'oposicion') {
-          for (const purpose of OPTIONAL_PURPOSES) await tx.query('INSERT INTO consents (user_id, purpose, policy_version, granted, recorded_at) VALUES ($1, $2, $3, false, $4)', [request.user_id, purpose, config.policyVersion, await consentTime(tx, request.user_id, purpose, when)]);
-          await tx.query('UPDATE profile_versions SET weight_kg = NULL, height_cm = NULL, sex_param = NULL, activity_level = NULL WHERE user_id = $1', [request.user_id]);
+          for (const purpose of OPTIONAL_PURPOSES) {
+            await tx.query('INSERT INTO consents (user_id, purpose, policy_version, granted, recorded_at) VALUES ($1, $2, $3, false, $4)', [request.user_id, purpose, config.policyVersion, await consentTime(tx, request.user_id, purpose, when)]);
+            await eraseForPurpose(tx, config, request.user_id, purpose);
+          }
         } else if (request.request_type === 'bloqueo') {
           await tx.query("UPDATE users SET status = 'blocked', session_version = session_version + 1, updated_at = $2 WHERE id = $1", [request.user_id, when]);
           await tx.query('UPDATE auth_sessions SET revoked_at = $2 WHERE user_id = $1 AND revoked_at IS NULL', [request.user_id, when]);

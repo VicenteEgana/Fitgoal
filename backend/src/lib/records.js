@@ -25,6 +25,22 @@ export async function usageEvent(tx, config, at, identifier, eventType) {
   await tx.query('INSERT INTO usage_events (pseudonym, event_type, occurred_at) VALUES ($1, $2, $3)', [pseudonymOf(config.pseudonymSecret, identifier), eventType, at]);
 }
 
+/** Evento de un participante: solo se registra si autorizó usar sus datos de uso para evaluar el piloto. */
+export async function participantEvent(tx, config, at, userId, eventType) {
+  if (await hasConsent(tx, userId, 'evaluacion_piloto')) await usageEvent(tx, config, at, userId, eventType);
+}
+
+/** Minimización: al revocar una finalidad se borra lo que esa finalidad autorizaba. */
+export async function eraseForPurpose(tx, config, userId, purpose) {
+  if (purpose === 'datos_corporales') await tx.query('UPDATE profile_versions SET weight_kg = NULL, height_cm = NULL, sex_param = NULL, activity_level = NULL WHERE user_id = $1', [userId]);
+  if (purpose === 'datos_nutricionales') await tx.query('UPDATE profile_versions SET sex_param = NULL, activity_level = NULL WHERE user_id = $1', [userId]);
+  if (purpose === 'datos_corporales' || purpose === 'seguimiento_progreso') await tx.query('DELETE FROM weight_records WHERE user_id = $1', [userId]);
+  if (purpose === 'evaluacion_piloto') {
+    await tx.query('UPDATE users SET enrolled_at = NULL WHERE id = $1', [userId]);
+    await tx.query('DELETE FROM usage_events WHERE pseudonym = $1', [pseudonymOf(config.pseudonymSecret, userId)]);
+  }
+}
+
 /** Último consentimiento otorgado o revocado por finalidad. */
 export async function consentState(tx, userId) {
   const result = await tx.query(

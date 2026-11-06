@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
+import 'privacy_policy.dart';
 
 final _email = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$');
 
@@ -26,6 +27,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _bodyData = false;
   bool _reminders = false;
   bool _progress = false;
+  bool _pilot = false;
   bool _fictitious = false;
   String? _error;
   String? _intentId;
@@ -63,6 +65,7 @@ class _AuthScreenState extends State<AuthScreen> {
             if (_bodyData) 'datos_corporales': true,
             if (_reminders) 'recordatorios': true,
             if (_progress) 'seguimiento_progreso': true,
+            if (_pilot) 'evaluacion_piloto': true,
           },
           fictitious: _fictitious,
           intentId: _intentId,
@@ -133,8 +136,12 @@ class _AuthScreenState extends State<AuthScreen> {
                       Text('Tratamiento de tus datos', style: Theme.of(context).textTheme.titleSmall),
                       const SizedBox(height: 4),
                       Text(
-                        'FitGoal es para personas adultas. Tus datos se usan solo para recomendarte rutinas y llevar tu seguimiento. Política de datos: $policyVersion.',
+                        'FitGoal es para personas adultas. Tus datos se usan solo para recomendarte rutinas y pautas de alimentación y llevar tu seguimiento. Política de datos: $policyVersion.',
                         style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(key: const Key('policy-link'), onPressed: () => showPrivacyPolicy(context), child: const Text('Leer la política de datos')),
                       ),
                       CheckboxListTile(
                         key: const Key('consent-account'),
@@ -175,6 +182,14 @@ class _AuthScreenState extends State<AuthScreen> {
                         controlAffinity: ListTileControlAffinity.leading,
                         contentPadding: EdgeInsets.zero,
                         title: const Text('Quiero registrar mi progreso, incluido mi peso (opcional).'),
+                      ),
+                      CheckboxListTile(
+                        key: const Key('consent-pilot'),
+                        value: _pilot,
+                        onChanged: (value) => setState(() => _pilot = value ?? false),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Participo en el piloto: autorizo usar mis datos de uso, sin mi nombre ni correo, para evaluar la aplicación (opcional).'),
                       ),
                       if (demoMode)
                         SwitchListTile(
