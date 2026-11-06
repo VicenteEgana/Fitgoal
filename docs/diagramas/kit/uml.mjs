@@ -65,7 +65,8 @@ export function nodeBox(svg, x, y, w, h, title, { stereotype = 'device', color =
   svg.rect(x, y + d, w, h - d, { r: 0, fill: color.fill, stroke: color.stroke, sw: 1.8, layer: 'bg' });
   svg.add('bg', textBlock(x + 12, y + d + 13, `«${stereotype}»`, { size: 10.5, anchor: 'start', fill: color.ink, italic: true }).svg);
   const titleLines = wrap(title, w - 24, 14.5, 700).length;
-  svg.add('bg', textBlock(x + 12, y + d + 32, title, { size: 14.5, weight: 700, anchor: 'start', fill: color.ink, maxWidth: w - 24 }).svg);
+  // El título crece hacia abajo para no montarse sobre el estereotipo cuando ocupa más de una línea.
+  svg.add('bg', textBlock(x + 12, y + d + 32 + ((titleLines - 1) * 17.7) / 2, title, { size: 14.5, weight: 700, anchor: 'start', fill: color.ink, maxWidth: w - 24 }).svg);
   if (lines.length) svg.add('bg', textBlock(x + 12, y + d + 48 + (titleLines - 1) * 17.7, lines.join('\n'), { size: 12, anchor: 'start', fill: THEME.ink, lh: 1.28, valign: 'top', maxWidth: w - 24 }).svg);
   return { x, y: y + d, w, h: h - d, cx: x + w / 2, cy: y + d + (h - d) / 2 };
 }

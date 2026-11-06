@@ -245,6 +245,31 @@ void main() {
       expect(find.byKey(const Key('no-plan')), findsNothing);
     });
 
+    testWidgets('el registro menciona la alimentación, abre la política y envía el consentimiento del piloto', (tester) async {
+      final server = FakeServer()
+        ..on('POST', '/api/public/registration-started', (_, _) => {})
+        ..on('POST', '/api/auth/register', (_, _) => FakeResponse(201, session('user')));
+      planRoutes(server);
+      await pumpApp(tester, server);
+      await press(tester, find.byKey(const Key('switch-mode')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('rutinas y pautas de alimentación'), findsOneWidget);
+      await press(tester, find.byKey(const Key('policy-link')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('policy-dialog')), findsOneWidget);
+      expect(find.text('Cuánto tiempo los conservamos'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('policy-close')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('email')), 'nueva@prueba.cl');
+      await tester.enterText(find.byKey(const Key('password')), 'Clave-de-prueba-2026');
+      await press(tester, find.byKey(const Key('consent-account')));
+      await press(tester, find.byKey(const Key('consent-profile')));
+      await press(tester, find.byKey(const Key('consent-pilot')));
+      await press(tester, find.byKey(const Key('submit')));
+      await tester.pumpAndSettle();
+      expect(server.calledTo('POST', '/api/auth/register').single.body!['consents'], {'registro_cuenta': true, 'perfil_entrenamiento': true, 'evaluacion_piloto': true});
+    });
+
     testWidgets('el registro exige aceptar los consentimientos obligatorios y envía la versión de la política', (tester) async {
       final server = FakeServer()
         ..on('POST', '/api/public/registration-started', (_, _) => {})
@@ -256,6 +281,8 @@ void main() {
       expect(server.calledTo('POST', '/api/public/registration-started'), hasLength(1));
       await tester.enterText(find.byKey(const Key('email')), 'nueva@prueba.cl');
       await tester.enterText(find.byKey(const Key('password')), 'Clave-de-prueba-2026');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
       await press(tester, find.byKey(const Key('submit')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('auth-error')), findsOneWidget);
@@ -281,6 +308,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const Key('email')), 'no-es-correo');
       await tester.enterText(find.byKey(const Key('password')), 'corta');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
       await press(tester, find.byKey(const Key('submit')));
       await tester.pumpAndSettle();
       expect(find.text('Ingresa un correo válido.'), findsOneWidget);
@@ -1222,6 +1251,17 @@ void main() {
       expect(find.textContaining('no sustituye una evaluación profesional'), findsOneWidget);
     });
 
+    testWidgets('el perfil permite autorizar la evaluación del piloto y leer la política', (tester) async {
+      final server = await openProfile(tester);
+      server.on('POST', '/api/consents', (_, _) => FakeResponse(201, {}));
+      await press(tester, find.byKey(const Key('consent-pilot')));
+      await tester.pumpAndSettle();
+      expect(server.calledTo('POST', '/api/consents').single.body, {'purpose': 'evaluacion_piloto', 'granted': true, 'policyVersion': 'politica-datos-2026-10-v1'});
+      await press(tester, find.byKey(const Key('policy-link')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('policy-dialog')), findsOneWidget);
+    });
+
     testWidgets('revocar un consentimiento llama a la API con la versión de la política', (tester) async {
       final server = await openProfile(tester);
       server.on('POST', '/api/consents', (_, _) => FakeResponse(201, {}));
@@ -1243,6 +1283,25 @@ void main() {
       await tester.pumpAndSettle();
       return server;
     }
+
+    testWidgets('revocar la estatura y el peso pide confirmar, y cancelar no borra nada', (tester) async {
+      final server = await openProfile(tester, granted: true, existing: profile(weight: 70, height: 175, bmi: 22.9, category: 'normal'));
+      server.on('POST', '/api/consents', (_, _) => FakeResponse(201, {}));
+      await press(tester, find.byKey(const Key('consent-body-data')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('tu historial de peso. No se puede deshacer.'), findsOneWidget);
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect(server.calledTo('POST', '/api/consents'), isEmpty);
+      expect(find.byKey(const Key('weight')), findsOneWidget);
+
+      await press(tester, find.byKey(const Key('consent-body-data')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirm-revoke')));
+      await tester.pumpAndSettle();
+      expect(server.calledTo('POST', '/api/consents').single.body, {'purpose': 'datos_corporales', 'granted': false, 'policyVersion': 'politica-datos-2026-10-v1'});
+      expect(find.byKey(const Key('weight')), findsNothing);
+    });
 
     testWidgets('sin consentimiento no se piden la estatura ni el peso y se puede otorgar desde el perfil', (tester) async {
       final server = await openProfile(tester, granted: false);
@@ -1297,6 +1356,8 @@ void main() {
       server.on('PUT', '/api/profiles/me', (_, _) => {'profile': profile(version: 2)});
       expect(find.byKey(const Key('weight')), findsOneWidget);
       await press(tester, find.byKey(const Key('consent-body-data')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirm-revoke')));
       await tester.pumpAndSettle();
       expect(server.calledTo('POST', '/api/consents').single.body!['granted'], false);
       expect(find.byKey(const Key('weight')), findsNothing);

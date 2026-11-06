@@ -52,10 +52,11 @@ export const PROCESSES = [
     objective: 'Permitir que el participante vea cada día qué le toca (la sesión o el descanso), registre las sesiones realizadas y observe su continuidad con la adherencia, la racha y el calendario, calculados de forma automática.',
     trigger: 'El participante tiene una rutina vigente (fin de P2).',
     actors: 'Participante y sistema FitGoal.',
-    result: 'Sesiones registradas, historial actualizado, adherencia y racha calculadas; un cambio de perfil vuelve a P1 para ver nuevas recomendaciones.',
+    result: 'Sesiones registradas o cambiadas de día, historial actualizado, adherencia y racha calculadas; un cambio de perfil vuelve a P1 para ver nuevas recomendaciones.',
     flow: [
       'El participante consulta su horario semanal (lunes a domingo); el sistema entrega la sesión de cada día con sus ejercicios aprobados, o el día de descanso con movilidad opcional del catálogo aprobado.',
-      'Realiza la sesión en el modo sesión de la app (marca sus series y usa el temporizador de descanso) o fuera de ella, y la registra como realizada, con su peso solo si está habilitado y hay consentimiento (SP3.1).',
+      'Si no puede hacer la sesión ese día, la cambia a un día libre (SP3.3): de hoy hasta 6 días después de su fecha, si venció hace 7 días o menos. El día original queda como «movida», que no suma ni corta la racha.',
+      'Si puede, realiza la sesión en el modo sesión de la app (marca sus series y usa el temporizador de descanso) o fuera de ella, y la registra como realizada, con su peso solo si está habilitado y hay consentimiento (SP3.1).',
       'El sistema actualiza el historial, la adherencia y la racha (las sesiones registradas y los días de descanso suman; el comodín semanal cubre una sesión sin registro por semana); el participante consulta su progreso y su calendario.',
       'Cada domingo a las 23:59 el sistema cierra la semana (SP3.2): las sesiones no registradas cuentan como no realizadas y, si el participante lo activó, crea un recordatorio interno.',
       'Si el participante cambia su disponibilidad u objetivo, el flujo continúa en P1 con nuevas recomendaciones, y su rutina vigente se mantiene hasta que inicie otra.',
@@ -63,8 +64,9 @@ export const PROCESSES = [
     subs: [
       ['SP3.1 Registro de sesión y peso', 'Verificar que la sesión es de la rutina vigente del participante y que su fecha no es futura, marcarla como realizada, verificar consentimiento y habilitación antes de guardar el peso, registrar el evento seudonimizado y recalcular la racha.', 'RF007, RF009, RNF002'],
       ['SP3.2 Cierre semanal y adherencia', 'Contar sesiones programadas y declaradas, tratar las no registradas como no realizadas (aunque el comodín semanal proteja la racha), calcular la adherencia acumulada con el denominador inicial, guardar el evento y crear el recordatorio si corresponde. El comodín de la racha se renueva cada lunes.', 'RF007, RF008'],
+      ['SP3.3 Cambio de día de la sesión', 'Verificar que la sesión es del participante, de su rutina vigente y está sin registrar, y que venció hace 7 días o menos; ofrecer los días libres de hoy a 6 días después de su fecha, avisando si alguno queda junto a otra sesión; validar el día elegido, mover la sesión guardando la fecha original, registrar la auditoría y recalcular el horario y la racha.', 'RF007'],
     ],
-    optimization: 'Las sesiones se programan automáticamente al iniciar la rutina; la adherencia y la racha se calculan sin intervención y no se guardan (se deducen de las sesiones y de los días de la rutina). La racha cuenta los descansos para no premiar entrenar sin descanso. El peso es opcional y se bloquea sin consentimiento, de modo que el seguimiento no exige datos que el participante no haya autorizado.',
+    optimization: 'Las sesiones se programan automáticamente al iniciar la rutina; la adherencia y la racha se calculan sin intervención y no se guardan (se deducen de las sesiones y de los días de la rutina). La racha cuenta los descansos para no premiar entrenar sin descanso. Cambiar una sesión de día evita que un imprevisto se convierta en una sesión perdida, sin pedir ayuda a nadie. El peso es opcional y se bloquea sin consentimiento, de modo que el seguimiento no exige datos que el participante no haya autorizado.',
     kpis: 'K2 (retención en la semana 4), K3 (adherencia declarada mayor o igual a 75%) y K4 (utilidad percibida).',
     rf: 'RF002, RF007, RF008, RF009',
   },
@@ -83,7 +85,7 @@ export const PROCESSES = [
       'El sistema registra la resolución, audita y avisa al titular, que recibe la respuesta y el comprobante.',
     ],
     subs: [
-      ['SP4.1 Ejecución según el tipo de derecho', 'Acceso: copia de los datos. Rectificación: nueva versión del perfil conservando la anterior. Oposición: dejar de tratar para la finalidad opcional y registrar la revocación, con borrado de la estatura y el peso. Bloqueo: suspender el tratamiento afectado dentro de 2 días hábiles. Exportación: archivo portable en JSON. Eliminación: eliminar o anonimizar y registrar la solicitud para reaplicarla tras restaurar copias.', 'RF009'],
+      ['SP4.1 Ejecución según el tipo de derecho', 'Acceso: copia de los datos. Rectificación: nueva versión del perfil conservando la anterior. Oposición: dejar de tratar para la finalidad opcional y registrar la revocación, con borrado de la estatura, el peso y el historial de peso. Bloqueo: suspender el tratamiento afectado dentro de 2 días hábiles. Exportación: archivo portable en JSON. Eliminación: eliminar o anonimizar y registrar la solicitud para reaplicarla tras restaurar copias.', 'RF009'],
     ],
     optimization: 'El comprobante y el plazo se calculan automáticamente, el sistema alerta antes del vencimiento y la ejecución queda auditada. Las eliminaciones se registran para reaplicarse si se restaura una copia de respaldo.',
     kpis: 'Se propone medir el porcentaje de solicitudes respondidas dentro del plazo (se formaliza en la sección de KPI y SLA).',
@@ -133,7 +135,7 @@ export const USE_CASE_SPECS = {
   'CU-17': { pre: 'Perfil recibido.', flow: ['Valida tipos y rangos: edad entera de 18 o más, 1 a 7 días únicos, duración de 20, 30, 45 o 60 minutos, objetivo, nivel y equipo.', 'Si informa el sexo y la actividad, exige la estatura, el peso y el consentimiento «datos_nutricionales».', 'Si informa la estatura y el peso, exige que vayan juntos, que estén en rangos humanos y que exista el consentimiento específico «datos_corporales».'], alt: 'Datos inválidos: error 400 con el campo. Estatura y peso sin consentimiento: 403.', post: 'Perfil válido, o error con el campo afectado.' },
   'CU-18': { pre: 'Perfil válido y reglas de entrenamiento aprobadas vigentes.', flow: ['Calcula el IMC (peso / estatura²) y su categoría con los cortes de la OMS, o del Minsal desde los 65 años; sin estatura y peso (o sin consentimiento vigente) usa la categoría «general».', 'Aplica los ajustes de seguridad de las reglas aprobadas: con bajo peso no se recomienda bajar de peso y con obesidad no se recomienda subir de peso.', 'Elige la división de la semana con la regla aprobada: principiante → full body; con experiencia y 6 o más días → push/pull/legs; con 4 o 5 días → upper/lower; si no, full body.', 'Busca en la matriz la rutina aprobada y vigente para objetivo × nivel × equipo × categoría × división; las otras divisiones de la misma combinación quedan como alternativas.', 'Marca avisos de ajuste (más o menos días, o más minutos, que su perfil) sin descartar la rutina.', 'Devuelve la lista con la recomendada primero, sus motivos (incluido el de la división) y los avisos de cuidado: el IMC es solo una referencia.'], alt: 'Sin coincidencia o sin reglas: no hay recomendadas y el catálogo sigue disponible.', post: 'Lista ordenada con motivos.' },
   'CU-19': { pre: 'Perfil válido y reglas de entrenamiento aprobadas vigentes.', flow: ['Lee de las reglas los grupos de ejercicios sugeridos para el objetivo.', 'Filtra los ejercicios aprobados por el nivel y el equipo del perfil y, con sobrepeso u obesidad, deja fuera los de alto impacto.', 'Ordena primero los grupos sugeridos y agrega el motivo de cada sugerencia.'], alt: 'Sin perfil o sin reglas aprobadas: 409, y el selector usa la biblioteca completa.', post: 'Ejercicios sugeridos, sin impedir elegir cualquier otro.' },
-  'CU-20': { pre: 'Operación que requiere datos de salud o nutricionales.', flow: ['Consulta el último consentimiento por finalidad (datos corporales y nutricionales).', 'Al revocarse, borra de todas las versiones del perfil los datos que autorizaba.'], alt: 'Sin consentimiento vigente o revocado: 403 con explicación.', post: 'Operación autorizada o rechazada.' },
+  'CU-20': { pre: 'Operación que requiere datos de salud o nutricionales.', flow: ['Consulta el último consentimiento por finalidad (datos corporales y nutricionales).', 'Al revocarse, borra de todas las versiones del perfil los datos que autorizaba y el historial de peso.'], alt: 'Sin consentimiento vigente o revocado: 403 con explicación.', post: 'Operación autorizada o rechazada.' },
   'CU-21': { pre: 'Rol preparador físico.', flow: ['Crea un ejercicio en borrador con descripción, grupo, nivel mínimo, equipo e indicación sugerida.', 'Guarda y registra la auditoría.', 'Puede retirar un ejercicio aprobado.'], alt: 'Un ejercicio usado por una rutina aprobada no se retira hasta retirar esas rutinas.', post: 'Ejercicio en borrador listo para aprobar (CU-23).' },
   'CU-22': { pre: 'Rol preparador físico.', flow: ['Crea una rutina en borrador: objetivo, nivel, equipo, categoría de IMC, rango de días, duración, semanas y resumen.', 'Compone las sesiones con ejercicios e indicaciones.', 'Guarda como versión nueva y registra la auditoría.', 'Puede retirar una rutina aprobada.'], alt: 'Una rutina aprobada no se edita: se crea una versión nueva. Las rutinas ya iniciadas por las personas no cambian.', post: 'Rutina en borrador lista para aprobar (CU-23).' },
   'CU-23': { pre: 'Ejercicio o rutina en borrador y rol preparador físico.', flow: ['Revisa el contenido.', 'Aprueba: el sistema verifica que los ejercicios de una rutina estén aprobados.', 'Registra aprobador, rol y fecha y retira la versión aprobada anterior.', 'Desde ese momento todas las personas lo ven.'], alt: 'Si falta aprobar un ejercicio, 409 con la lista. La base de datos exige que el aprobador tenga rol preparador.', post: 'Contenido vigente para todas las personas.' },
@@ -145,6 +147,7 @@ export const USE_CASE_SPECS = {
   'CU-29': { pre: 'Piloto en ejecución o con datos de prueba.', flow: ['El administrador elige un indicador (K1 a K9).', 'El sistema calcula numerador y denominador con eventos seudonimizados, sesiones y rutinas.', 'Muestra el tamaño de la muestra y sus límites.'], alt: 'Sin datos: se informa «sin mediciones»; no se estiman resultados.', post: 'Indicador mostrado.' },
   'CU-30': { pre: 'Job de respaldo configurado.', flow: ['Verifica la ejecución diaria del respaldo.', 'Restaura una copia en un ambiente aislado.', 'Comprueba los conteos de perfiles, rutinas y consentimientos.', 'Reaplica las eliminaciones pendientes.', 'Registra el RPO y el RTO medidos.'], alt: 'Si la restauración falla o supera el RTO de 4 horas, se registra como incidente y se corrige antes del piloto.', post: 'Recuperación demostrada.' },
   'CU-31': { pre: 'Servicio desplegado.', flow: ['Revisa los sondeos de API y base de datos, cada 5 minutos.', 'Ante una falla, detiene el acceso afectado y preserva los registros técnicos.', 'Evalúa el alcance y las obligaciones de comunicación.', 'Restablece el servicio y registra el incidente.'], alt: 'Si hay riesgo para datos personales, se activa la evaluación de obligaciones de comunicación.', post: 'Servicio restablecido e incidente registrado.' },
+  'CU-32': { pre: 'Rutina vigente con una sesión sin registrar de hoy, de un día futuro o vencida hace 7 días o menos.', flow: ['En «Mi rutina» o en el horario, el participante toca «Cambiar de día» en la sesión que no puede hacer.', 'El sistema ofrece los días libres desde hoy hasta 6 días después de la fecha de la sesión y avisa si alguno queda junto a otra sesión, sin descanso entre ambas.', 'El participante elige un día.', 'El sistema mueve la sesión, guarda la fecha original y registra la auditoría.', 'El horario muestra la sesión en su nuevo día y el día original como «movida».'], alt: 'Sesión registrada, de una rutina reemplazada o vencida hace más de 7 días: 409, con la sugerencia de registrarla si la hizo. Día ocupado por otra sesión: 409. Día pasado o fuera del rango: 400.', post: 'Sesión reprogramada; el día «movida» no suma ni corta la racha y la adherencia la cuenta en su nueva fecha.' },
 };
 
 export const COMPONENTS = [
@@ -161,7 +164,7 @@ export const COMPONENTS = [
   ['Alimentación', 'API REST', 'Pautas de 7 días aprobadas, con los gramos ajustados a las calorías del objetivo; cambio de un alimento por un equivalente aprobado del mismo grupo; catálogo nutricional de la nutricionista (alimentos y pautas).', 'Cálculo energético; Perfil y consentimiento; Auditoría', 'GET /meal-plans, GET /meal-plans/{id}, GET /meal-plans/{id}/alternatives, PUT y DELETE /meal-plans/{id}/swaps; /catalog/foods, /catalog/meal-plans (con /approve y /retire)'],
   ['Recomendación', 'API REST', 'Cálculo del IMC, reglas de seguridad, elección de la división de la semana, rutinas recomendadas según las reglas aprobadas, exploración del catálogo, biblioteca de ejercicios y sugerencias según el objetivo.', 'Perfil y consentimiento; Catálogo', 'GET /routines, GET /routines/{id}, GET /exercises, GET /exercises/suggestions'],
   ['Rutinas del participante', 'API REST', 'Iniciar una rutina recomendada o propia, validar y copiar su contenido, programar sesiones, rutina vigente e historial.', 'Recomendación; Perfil y consentimiento; Catálogo; Auditoría', 'POST /plans/start; GET /plans/me; GET /plans/me/history'],
-  ['Progreso', 'API REST', 'Horario semanal con días de descanso, sesiones programadas y realizadas, peso con consentimiento, adherencia, racha con comodín semanal y calendario.', 'Rutinas del participante (rutina vigente); Perfil y consentimiento; Notificaciones', 'GET /schedule/me; GET /sessions/me; POST /sessions/{id}/complete; GET y POST /weights/me; GET /progress/me'],
+  ['Progreso', 'API REST', 'Horario semanal con días de descanso, sesiones programadas y realizadas, cambio de día de una sesión sin registrar, peso con consentimiento, adherencia, racha con comodín semanal y calendario.', 'Rutinas del participante (rutina vigente); Perfil y consentimiento; Notificaciones; Auditoría', 'GET /schedule/me; GET /sessions/me; POST /sessions/{id}/complete; GET /sessions/{id}/move-options; POST /sessions/{id}/move; GET y POST /weights/me; GET /progress/me'],
   ['Notificaciones', 'API REST', 'Avisos internos sin información sensible y recordatorios de sesiones.', 'Acceso a datos', 'GET /notifications/me; POST /notifications/{id}/read'],
   ['Derechos de datos', 'API REST', 'Solicitudes del titular, comprobantes, plazos y ejecución por tipo de derecho.', 'Perfil y consentimiento; Identidad; Auditoría', 'GET y POST /data-requests; GET /admin/data-requests; POST /admin/data-requests/{id}/resolve'],
   ['Auditoría', 'API REST', 'Bitácora de solo anexado con autor, fecha, entidad y versión.', 'Acceso a datos', 'GET /admin/audit'],
@@ -178,7 +181,7 @@ export const TRACE = [
   ['RF004', 'Rutinas recomendadas y propias', 'CU-04 a CU-09, CU-18, CU-19, CU-21, CU-22', 'Catálogo; Recomendación; Rutinas del participante', 'routine_templates, template_exercises, exercises, rule_versions, user_plans, user_plan_exercises', 'P1 (SP1.3), P2 (SP2.1, SP2.2)', 'K5, K6, K9', 'P04'],
   ['RF005', 'Pauta de alimentación de 7 días', 'CU-16, CU-25', 'Alimentación; Cálculo energético; Catálogo', 'foods, meal_plan_templates, meal_plan_items, meal_plan_swaps, rule_versions', 'P5', 'K5, K6', 'P05'],
   ['RF006', 'Aprobación profesional del catálogo', 'CU-21 a CU-24', 'Catálogo', 'exercises, routine_templates, rule_versions', 'P5 (SP5.1, SP5.2)', 'K5', 'P06'],
-  ['RF007', 'Progreso y sesiones', 'CU-10, CU-11, CU-12, CU-29', 'Progreso', 'training_sessions, weight_records, usage_events', 'P3 (SP3.1, SP3.2)', 'K2, K3, K4', 'P07'],
+  ['RF007', 'Progreso y sesiones', 'CU-10, CU-11, CU-12, CU-29, CU-32', 'Progreso', 'training_sessions, weight_records, usage_events', 'P3 (SP3.1, SP3.2, SP3.3)', 'K2, K3, K4', 'P07'],
   ['RF008', 'Aviso interno', 'CU-13', 'Notificaciones', 'notifications', 'P3', 'K2', 'P08'],
   ['RF009', 'Control de datos', 'CU-01, CU-14, CU-20, CU-27', 'Derechos de datos; Perfil y consentimiento', 'consents, data_requests', 'P4 (SP4.1)', 'K1, K5', 'P09'],
   ['RF010', 'Roles y auditoría', 'CU-02, CU-26, CU-28', 'Identidad; Auditoría', 'users, audit_log', 'P5', 'K5', 'P10'],
@@ -186,4 +189,34 @@ export const TRACE = [
   ['RNF002', 'Seguridad y datos', 'CU-02, CU-20', 'Plataforma; Identidad; Auditoría', 'users, auth_sessions, consents, audit_log', 'P1 (SP1.1), P4', 'K5', 'P12'],
   ['RNF003', 'Disponibilidad y recuperación', 'CU-30, CU-31', 'Job de respaldo; Sondeo externo', '—', '—', 'K7', 'P13'],
   ['RNF004', 'Rendimiento', 'CU-04, CU-06', 'Recomendación; Plataforma', 'routine_templates, rule_versions', 'P1 (SP1.3), P2', 'K6', 'P14'],
+];
+
+// Procesos BPMN que van en el cuerpo del informe; los otros dos quedan en el anexo.
+export const MAIN_PROCESSES = ['P1', 'P3', 'P5'];
+export const PROCESS_CHOICE = [
+  ['P1 · Registro, perfil y recomendación', 'Es la puerta de entrada y entrega la propuesta de valor: consentimiento informado, datos de salud opcionales e IMC, y rutinas aprobadas al instante. Cubre RF001, RF002, RF004 y RF009 y los KPI K1 y K6.'],
+  ['P3 · Seguimiento de sesiones y progreso', 'Es el proceso que se repite cada semana y el que produce los datos de adherencia y retención con que se evalúa el piloto (K2, K3 y K4). Incluye el cierre semanal automático y el cambio de día de una sesión.'],
+  ['P5 · Gobierno del catálogo', 'Sostiene la credibilidad y la seguridad del servicio: un profesional competente aprueba una sola vez, con versión y auditoría, todo lo que reciben las personas (RF006, K5). Es la decisión de diseño que reemplazó la revisión caso a caso y permite escalar.'],
+];
+
+// Figuras del informe, en orden. generate.mjs las copia numeradas a docs/entrega_es2/.
+export const SELECTION = [
+  { layer: 'Procesos de negocio (BPMN)', file: 'bpmn-p1-registro-y-recomendacion', caption: 'P1 · Registro, perfil y recomendación de rutinas aprobadas (nivel 1)' },
+  { layer: 'Procesos de negocio (BPMN)', file: 'bpmn-p1-subprocesos', caption: 'P1 · Subprocesos SP1.1 a SP1.3' },
+  { layer: 'Procesos de negocio (BPMN)', file: 'bpmn-p3-seguimiento', caption: 'P3 · Seguimiento de sesiones y progreso (nivel 1)' },
+  { layer: 'Procesos de negocio (BPMN)', file: 'bpmn-p3-subprocesos', caption: 'P3 · Subprocesos SP3.1 a SP3.3' },
+  { layer: 'Procesos de negocio (BPMN)', file: 'bpmn-p5-catalogo-profesional', caption: 'P5 · Gobierno del catálogo: aprobación profesional (nivel 1)' },
+  { layer: 'Procesos de negocio (BPMN)', file: 'bpmn-p5-subprocesos', caption: 'P5 · Subprocesos SP5.1 y SP5.2' },
+  { layer: 'Capa lógica', file: 'cu-1-participante', caption: 'Casos de uso del participante' },
+  { layer: 'Capa lógica', file: 'cu-2-profesionales-y-administracion', caption: 'Casos de uso de profesionales y administración' },
+  { layer: 'Capa lógica', file: 'ar-1-componentes', caption: 'Diagrama de componentes' },
+  { layer: 'Capa de datos', file: 'er-0-general', caption: 'Modelo de datos: vista general (20 tablas en 4 módulos)' },
+  { layer: 'Capa de datos', file: 'er-1-identidad', caption: 'Modelo de datos: identidad, consentimiento y derechos' },
+  { layer: 'Capa de datos', file: 'er-2-catalogo', caption: 'Modelo de datos: catálogo de entrenamiento y reglas' },
+  { layer: 'Capa de datos', file: 'er-2b-alimentacion', caption: 'Modelo de datos: catálogo nutricional y cambios de alimento' },
+  { layer: 'Capa de datos', file: 'er-3-planes', caption: 'Modelo de datos: perfil y rutinas del participante' },
+  { layer: 'Capa de datos', file: 'er-4-seguimiento', caption: 'Modelo de datos: seguimiento, avisos y trazabilidad' },
+  { layer: 'Capa física y de red', file: 'ar-2-topologia', caption: 'Topología de comunicaciones' },
+  { layer: 'Capa física y de red', file: 'ar-3-infraestructura', caption: 'Diagrama de infraestructura' },
+  { layer: 'Capa física y de red', file: 'ar-4-arquitectura-integrada', caption: 'Arquitectura TI integral de la solución' },
 ];

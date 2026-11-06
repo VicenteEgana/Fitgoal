@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../common.dart';
+import '../privacy_policy.dart';
 
 const _sexLabels = {'masculino': 'Masculino', 'femenino': 'Femenino'};
 const _activityLabels = {
@@ -139,7 +140,25 @@ class _ProfileFormState extends State<ProfileForm> {
     }
   }
 
+  /// Revocar estas finalidades borra datos y no se puede deshacer: se pide confirmar.
+  Future<bool> _confirmRevoke(String purpose) async {
+    if (purpose != 'datos_corporales' && purpose != 'seguimiento_progreso') return true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('¿Revocar este consentimiento?'),
+        content: Text(purpose == 'datos_corporales' ? 'Borraremos tu estatura, tu peso, tu sexo, tu nivel de actividad y tu historial de peso. No se puede deshacer.' : 'Borraremos tu historial de peso. No se puede deshacer.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancelar')),
+          FilledButton(key: const Key('confirm-revoke'), onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Revocar y borrar')),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
   Future<void> _toggleConsent(String purpose, bool value) async {
+    if (!value && !await _confirmRevoke(purpose)) return;
     try {
       await widget.api.post('/api/consents', {'purpose': purpose, 'granted': value, 'policyVersion': policyVersion});
       setState(() {
@@ -238,7 +257,7 @@ class _ProfileFormState extends State<ProfileForm> {
                 key: const Key('consent-body-data'),
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Usar mi estatura y peso para recomendarme rutinas'),
-                subtitle: const Text('Es un dato de salud y es opcional. Con él calculamos tu IMC y afinamos las recomendaciones. Puedes revocarlo cuando quieras y se borra.'),
+                subtitle: const Text('Es un dato de salud y es opcional. Con él calculamos tu IMC y afinamos las recomendaciones. Puedes revocarlo cuando quieras y se borra, junto con tu historial de peso.'),
                 value: _bodyOn,
                 onChanged: (value) => _toggleConsent('datos_corporales', value),
               ),
@@ -327,6 +346,7 @@ class _ProfileFormState extends State<ProfileForm> {
                 key: const Key('consent-progress'),
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Registrar mi progreso, incluido el peso'),
+                subtitle: const Text('Si lo revocas, se borra tu historial de peso.'),
                 value: _consents['seguimiento_progreso'] ?? false,
                 onChanged: (value) => _toggleConsent('seguimiento_progreso', value),
               ),
@@ -337,7 +357,19 @@ class _ProfileFormState extends State<ProfileForm> {
                 value: _consents['recordatorios'] ?? false,
                 onChanged: (value) => _toggleConsent('recordatorios', value),
               ),
+              SwitchListTile(
+                key: const Key('consent-pilot'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Participar en la evaluación del piloto'),
+                subtitle: const Text('Usamos tus datos de uso, sin tu nombre ni correo, para evaluar la aplicación. Si lo revocas, sales del piloto y se borran.'),
+                value: _consents['evaluacion_piloto'] ?? false,
+                onChanged: (value) => _toggleConsent('evaluacion_piloto', value),
+              ),
               Text('Política de datos vigente: $policyVersion', style: Theme.of(context).textTheme.bodySmall),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(key: const Key('policy-link'), onPressed: () => showPrivacyPolicy(context), child: const Text('Leer la política de datos')),
+              ),
             ],
           ),
         ],

@@ -5,6 +5,7 @@ import { audit, notify } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
 import { hashPassword, pseudonymOf, validatePassword } from '../lib/security.js';
 import { addDays, localDate } from '../lib/time.js';
+import { eraseUser } from './datarights.js';
 import { normalizeEmail } from './identity.js';
 import { uuidParam } from '../lib/validate.js';
 
@@ -13,7 +14,31 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const userRow = row => ({ id: row.id, email: row.email.startsWith('eliminado-') ? null : row.email, role: row.role, status: row.status, isFictitious: row.is_fictitious, enrolledAt: row.enrolled_at, createdAt: row.created_at });
 
 /**
- * Tareas periódicas: recordatorios de sesiones pendientes para quienes los activaron.
+ * Aplica los plazos de conservación de la política de datos. Solo elimina cuentas de participantes reales, activas y sin
+ * solicitudes de derechos abiertas. La última sesión de cada persona se conserva: de ella sale su fecha de última actividad.
+ */
+async function applyRetention(tx, config, at) {
+  const { inactiveAccountDays, closedSessionDays, notificationDays, usageEventDays } = config.retention;
+  const before = days => new Date(at.getTime() - days * 24 * 60 * 60 * 1000);
+  const inactive = (await tx.query(
+    `SELECT u.id FROM users u
+      WHERE u.role = 'user' AND u.status = 'active' AND NOT u.is_fictitious
+        AND GREATEST(u.created_at, (SELECT max(s.last_used_at) FROM auth_sessions s WHERE s.user_id = u.id)) < $1
+        AND NOT EXISTS (SELECT 1 FROM data_requests r WHERE r.user_id = u.id AND r.status IN ('recibida', 'en_curso'))`, [before(inactiveAccountDays)])).rows;
+  for (const { id } of inactive) {
+    await eraseUser(tx, config, id, at);
+    await audit(tx, at, { action: 'user.purged', entityType: 'user', entityId: id, detail: { reason: 'inactividad', days: inactiveAccountDays } });
+  }
+  const closed = await tx.query(
+    `DELETE FROM auth_sessions s WHERE (s.expires_at < $1 OR s.revoked_at < $1)
+        AND EXISTS (SELECT 1 FROM auth_sessions newer WHERE newer.user_id = s.user_id AND newer.last_used_at > s.last_used_at)`, [before(closedSessionDays)]);
+  const notices = await tx.query('DELETE FROM notifications WHERE created_at < $1', [before(notificationDays)]);
+  const events = await tx.query('DELETE FROM usage_events WHERE occurred_at < $1', [before(usageEventDays)]);
+  return { accountsPurged: inactive.length, sessionsPurged: closed.rowCount, notificationsPurged: notices.rowCount, usageEventsPurged: events.rowCount };
+}
+
+/**
+ * Tareas periódicas: recordatorios de sesiones pendientes para quienes los activaron y plazos de conservación.
  * Es idempotente: no repite un recordatorio ya enviado en los últimos 7 días.
  */
 export async function runMaintenance(ctx) {
@@ -32,6 +57,7 @@ export async function runMaintenance(ctx) {
       await notify(tx, now(), row.user_id, 'sesiones_pendientes', `Tienes ${row.missing} ${row.missing === 1 ? 'sesión' : 'sesiones'} de la última semana sin registrar.`);
       stats.sessionReminders += 1;
     }
+    Object.assign(stats, await applyRetention(tx, config, now()));
   });
   return stats;
 }

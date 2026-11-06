@@ -38,14 +38,14 @@ export function topology() {
   s.rect(20, 90, 270, 560, { r: 14, fill: '#f8fafc', stroke: THEME.faint, sw: 1.6, layer: 'bg', dash: '6 4' });
   s.add('bg', textBlock(36, 110, 'Usuarios (Wi-Fi, 4G o 5G)', { size: 13.5, weight: 700, anchor: 'start', fill: THEME.sub }).svg);
   nodeBox(s, 36, 130, 220, 110, 'Smartphone del participante', { stereotype: 'device', lines: ['App FitGoal · Android 10+'] });
-  nodeBox(s, 36, 270, 220, 110, 'Smartphone del profesional o administrador', { stereotype: 'device', lines: ['App FitGoal · Android 10+'] });
+  nodeBox(s, 36, 262, 220, 128, 'Smartphone del profesional o administrador', { stereotype: 'device', lines: ['App FitGoal · Android 10+'] });
   // Internet
   s.rect(330, 215, 190, 120, { r: 60, fill: THEME.blue.fill, stroke: THEME.blue.stroke, sw: 2, dash: '8 5' });
   s.add('nodes', textBlock(425, 262, 'Internet público', { size: 15, weight: 700, fill: THEME.blue.ink }).svg);
   s.add('nodes', textBlock(425, 295, 'DNS · IPv4/IPv6 · enrutamiento del operador', { size: 11.5, maxWidth: 150, fill: THEME.sub }).svg);
   // Render
   s.rect(560, 90, 700, 600, { r: 16, fill: '#fbfcfe', stroke: THEME.blue.stroke, sw: 2.2, layer: 'bg' });
-  s.add('bg', textBlock(578, 112, '«cloud»  Render · región por confirmar (candidata: US East)', { size: 14, weight: 700, anchor: 'start', fill: THEME.blue.ink }).svg);
+  s.add('bg', textBlock(578, 112, '«cloud»  Render · región Virginia (Estados Unidos)', { size: 14, weight: 700, anchor: 'start', fill: THEME.blue.ink }).svg);
   s.add('bg', textBlock(578, 134, 'La API y la base de datos se comunican por la red privada del proveedor', { size: 12, anchor: 'start', fill: THEME.sub }).svg);
   const edge = artifact(s, 600, 170, 330, 104, 'Borde de Render (balanceador gestionado)', ['Termina TLS 1.2 o 1.3', 'Certificado gestionado', 'Redirige HTTP a HTTPS · puerto 443'], { color: THEME.blue });
   const api = artifact(s, 600, 350, 330, 128, 'Servicio web de la API', ['Node.js 24 LTS · Express 5', 'Escucha en PORT (red privada)', 'Límite: 120 solicitudes/min y 10 intentos fallidos de autenticación en 15 min (429)'], { color: THEME.amber });
@@ -68,7 +68,7 @@ export function topology() {
   link(s, [[cron.x + cron.w, cron.cy], [store.x, store.cy]], 5, [1280, cron.cy]);
   link(s, [[probe.x, probe.cy], [1280, probe.cy], [1280, 222], [edge.x + edge.w, 222]], 6, [1280, 270], { dash: '7 5' });
   link(s, [[gh.x, gh.cy], [1260, gh.cy]], 7, [1280, gh.cy], { dash: '7 5' });
-  link(s, [[146, 470], [146, 395]], 8, [146, 432], { dash: '7 5' });
+  link(s, [[146, 470], [146, 402]], 8, [146, 436], { dash: '7 5' });
   s.text(580, 678, 'Todo el tráfico del usuario entra por HTTPS en el puerto 443; ningún otro puerto se publica en Internet.', { size: 12, anchor: 'start', fill: THEME.sub });
 
   s.text(30, tableY - 24, 'Protocolos y características de transmisión', { size: 15, weight: 700, anchor: 'start' });
@@ -77,8 +77,8 @@ export function topology() {
 }
 
 export const ENVIRONMENTS = [
-  ['Desarrollo local', 'Estación de cada integrante: API y PostgreSQL 18 en Docker Compose; la app en emulador o teléfono', 'Ficticios; sin datos personales ni de salud', 'Credenciales propias de desarrollo; archivo .env fuera del repositorio', 'Construir y probar cada cambio; pruebas automáticas con PostgreSQL en proceso (PGlite)'],
-  ['Staging local', 'Misma configuración, con migraciones y datos de prueba idénticos a los del piloto', 'Ficticios', 'Servicios y credenciales separados de los de desarrollo', 'Aceptación de cada hito y ensayo de revisión y restauración'],
+  ['Desarrollo local', 'Estación de cada integrante: la API con PostgreSQL 18 en proceso (PGlite); la app en el navegador (Flutter web), el emulador o un teléfono', 'Ficticios; sin datos personales ni de salud', 'Credenciales propias de desarrollo; archivo .env fuera del repositorio', 'Construir y probar cada cambio; pruebas automáticas con PostgreSQL en proceso (PGlite)'],
+  ['Staging local', 'La misma API conectada por DATABASE_URL a un PostgreSQL 18, con las mismas migraciones y datos de prueba que el piloto', 'Ficticios', 'Servicios y credenciales separados de los de desarrollo', 'Aceptación de cada hito y ensayo de revisión y restauración'],
   ['Piloto en Render', 'Servicio web de la API y PostgreSQL 18 gestionados, con respaldo cifrado externo', 'Reales solo si se resuelve la habilitación de datos; de lo contrario, ficticios', 'Base de datos y secretos independientes; acceso individual del equipo', 'Se habilita tras aceptar pruebas, restauración, política de datos y financiamiento'],
 ];
 
@@ -87,41 +87,43 @@ export function infrastructure() {
   const widths = [190, 360, 300, 340, 440];
   const headers = ['Ambiente', 'Dónde corre', 'Datos', 'Secretos y accesos', 'Uso y condición'];
   const th = tableHeight(widths, headers, ENVIRONMENTS);
-  const tableY = 870;
+  const tableY = 1010;
   const h = Math.ceil(tableY + th + 30);
   const s = new Svg(w, h, { title: 'AR 3 Diagrama de infraestructura', desc: 'Nodos físicos y en la nube que soportan la solución, con sus especificaciones' });
   s.text(30, 24, 'AR 3 · Diagrama de infraestructura', { size: 20, weight: 700, anchor: 'start' });
   s.text(30, 46, 'Hardware y servicios en la nube que soportan la solución, con sus especificaciones mínimas y los tres ambientes de trabajo', { size: 13, anchor: 'start', fill: THEME.sub });
 
-  const phones = nodeBox(s, 30, 100, 360, 170, 'Smartphones Android ×2 (más un emulador)', { stereotype: 'device', lines: ['Android 10 o superior · 2 GB de RAM · ancho mínimo 360 dp · 200 MB libres para instalación y caché'] });
-  artifact(s, 50, 215, 320, 44, 'Artefacto: aplicación FitGoal (Flutter)', [], { color: THEME.blue });
-  const dev = nodeBox(s, 30, 340, 430, 440, 'Estaciones de desarrollo ×3 (equipos propios)', { stereotype: 'device', lines: ['Mínimo 8 GB de RAM y 20 GB libres; 16 GB recomendados para el emulador'] });
-  artifact(s, 50, 470, 390, 52, 'Flutter, Dart y emulador Android', ['VS Code o Android Studio'], { color: THEME.blue });
-  artifact(s, 50, 534, 390, 52, 'Node.js 24 LTS y Express 5', ['Pruebas de la API con Node y Supertest'], { color: THEME.amber });
-  artifact(s, 50, 598, 390, 66, 'Docker Compose', ['API y PostgreSQL 18 locales: desarrollo y staging ficticio'], { color: THEME.teal });
-  artifact(s, 50, 676, 390, 66, 'Pruebas automáticas y de carga', ['PostgreSQL en proceso (PGlite) y k6 con 10 clientes virtuales'], { color: THEME.gray });
+  // Las estaciones van arriba (enlace a GitHub) y los teléfonos abajo (enlace a la API), para que los enlaces no se crucen.
+  const dev = nodeBox(s, 30, 100, 430, 400, 'Estaciones de desarrollo ×3 (equipos propios)', { stereotype: 'device', lines: ['Mínimo 8 GB de RAM y 20 GB libres; 16 GB recomendados para el emulador'] });
+  artifact(s, 50, 205, 390, 52, 'Flutter, Dart y emulador Android', ['VS Code o Android Studio'], { color: THEME.blue });
+  artifact(s, 50, 269, 390, 52, 'Node.js 24 LTS y Express 5', ['La API completa corre en la estación'], { color: THEME.amber });
+  artifact(s, 50, 333, 390, 66, 'PostgreSQL 18 en proceso (PGlite)', ['Base local por defecto y de las pruebas; con DATABASE_URL la API usa un PostgreSQL 18 (staging)'], { color: THEME.teal });
+  artifact(s, 50, 411, 390, 66, 'Pruebas automáticas y de carga', ['flutter_test, Node y Supertest sobre PGlite; k6 con 10 clientes virtuales (planificado)'], { color: THEME.gray });
+  const phones = nodeBox(s, 30, 570, 360, 170, 'Smartphones Android ×2 (más un emulador)', { stereotype: 'device', lines: ['Android 10 o superior · 2 GB de RAM · ancho mínimo 360 dp · 200 MB libres para instalación y caché'] });
+  artifact(s, 50, 685, 320, 44, 'Artefacto: aplicación FitGoal (Flutter)', [], { color: THEME.blue });
+  const play = nodeBox(s, 30, 800, 360, 130, 'Google Play Console', { stereotype: 'cloud', lines: ['Prueba interna del piloto; la producción pública se difiere'] });
 
   const gh = nodeBox(s, 560, 100, 400, 170, 'GitHub', { stereotype: 'cloud', lines: ['Repositorio del código y tablero de tareas (GitHub Projects)', 'GitHub Actions: análisis y pruebas en cada cambio'] });
   s.rect(600, 330, 740, 520, { r: 16, fill: '#fbfcfe', stroke: THEME.blue.stroke, sw: 2.2, layer: 'bg' });
-  s.add('bg', textBlock(618, 352, '«cloud»  Render · región por confirmar (candidata: US East) · red privada', { size: 14, weight: 700, anchor: 'start', fill: THEME.blue.ink }).svg);
+  s.add('bg', textBlock(618, 352, '«cloud»  Render · región Virginia (Estados Unidos) · red privada', { size: 14, weight: 700, anchor: 'start', fill: THEME.blue.ink }).svg);
   const api = nodeBox(s, 625, 380, 330, 200, 'Servicio web de la API', { stereotype: 'execution environment', lines: ['0,5 CPU · 512 MB de RAM', 'Node.js 24 LTS · Express 5', 'Despliegue automático tras aprobar la integración continua'], color: THEME.amber });
   const db = nodeBox(s, 985, 380, 330, 200, 'PostgreSQL 18 gestionado', { stereotype: 'database', lines: ['0,1 CPU · 256 MB de RAM', '1 GB de almacenamiento', 'Conexión con TLS y respaldo propio del proveedor'], color: THEME.teal });
   const cron = nodeBox(s, 985, 640, 330, 170, 'Job de respaldo diario', { stereotype: 'cron job', lines: ['pg_dump de solo lectura y cifrado AES-256', 'Siete copias diarias y cuatro semanales'], color: THEME.gray });
   artifact(s, 625, 640, 330, 170, 'Secretos y variables por ambiente', ['JWT, HMAC de seudónimos y cadena de conexión', 'Nunca en el repositorio', 'Rotación al cambiar de responsable de operación'], { color: THEME.violet });
 
-  const play = nodeBox(s, 1440, 100, 230, 170, 'Google Play Console', { stereotype: 'cloud', lines: ['Prueba interna del piloto; la producción pública se difiere'] });
+  artifact(s, 1440, 100, 245, 170, 'Estado de la infraestructura', ['Hoy: la app, la API y PostgreSQL en proceso corren y se prueban en las estaciones de desarrollo.', 'Para el piloto: Render, respaldo externo, sondeo, GitHub Actions, k6 y Google Play.'], { color: THEME.white });
   const probe = nodeBox(s, 1440, 340, 230, 150, 'Sondeo externo', { stereotype: 'cloud', lines: ['GET /health cada 5 minutos'] });
   const store = nodeBox(s, 1440, 640, 230, 170, 'Almacenamiento externo', { stereotype: 'cloud', lines: ['Compatible con S3', 'Cifrado en reposo; claves separadas'] });
 
   const link2 = (pts, label, o = {}) => s.edge(pts, { color: THEME.line, width: 2, head: o.head ?? 'fill', dash: o.dash, label, labelSize: 11.5, labelFill: THEME.sub, radius: 8, labelDy: o.labelDy ?? -10, labelDx: o.labelDx ?? 0, labelSeg: o.labelSeg ?? 0, labelAnchor: o.anchor });
-  link2([[phones.x + phones.w + 12, 190], [480, 190], [480, 480], [625, 480]], 'HTTPS (443)', { labelSeg: 1, labelDy: -20, labelDx: -8, anchor: 'end' });
-  link2([[dev.x + dev.w + 12, 400], [535, 400], [535, 215], [560, 215]], 'git push', { labelSeg: 1, labelDy: 20, labelDx: 8, anchor: 'start' });
+  link2([[dev.x + dev.w + 12, 185], [gh.x, 185]], 'git push');
+  link2([[phones.x + phones.w + 12, phones.cy], [520, phones.cy], [520, 480], [api.x, 480]], 'HTTPS (443)', { labelSeg: 1, labelDx: 10, labelDy: 0, anchor: 'start' });
   link2([[760, 270], [760, 330]], 'deploy hook', { labelDx: 50, labelDy: 0 });
   link2([[api.x + api.w, 480], [db.x, 480]], 'TLS · 5432', { labelDy: -10 });
   link2([[db.cx, 580], [db.cx, 640]], 'pg_dump', { labelDx: 36, labelDy: 0 });
   link2([[cron.x + cron.w, cron.cy], [store.x, cron.cy]], 'HTTPS', { labelDy: -10 });
   link2([[probe.x, probe.cy], [1340, probe.cy]], 'GET /health (HTTPS)', { dash: '7 5', labelDy: -10 });
-  link2([[play.cx, 100], [play.cx, 64], [210, 64], [210, 100]], 'instalación de pruebas', { dash: '7 5', labelSeg: 1, labelDy: -10 });
+  link2([[210, 800], [210, phones.y + phones.h]], 'instalación de pruebas', { dash: '7 5', labelDx: 12, labelDy: 0, anchor: 'start' });
 
   s.text(30, tableY - 24, 'Ambientes de trabajo', { size: 15, weight: 700, anchor: 'start' });
   drawTable(s, 30, tableY, widths, headers, ENVIRONMENTS, { size: 12, badgeCol: 0 });

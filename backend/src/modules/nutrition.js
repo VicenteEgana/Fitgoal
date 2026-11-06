@@ -2,7 +2,7 @@
 // (déficit, mantenimiento o superávit), y el catálogo nutricional (alimentos y pautas) que gestiona la nutricionista.
 import { Router } from 'express';
 import { fail } from '../lib/errors.js';
-import { audit, currentProfile, hasConsent, usageEvent } from '../lib/records.js';
+import { audit, currentProfile, hasConsent, participantEvent } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
 import { uuidParam } from '../lib/validate.js';
 import { bodyOf } from '../lib/body.js';
@@ -188,7 +188,7 @@ export function nutritionRouter(ctx) {
 
   router.get('/meal-plans/:id', participant, async (req, res) => {
     const plan = await personalPlan(db, req.auth.userId, await approvedTemplate(db, req.params.id));
-    await usageEvent(db, config, now(), req.auth.userId, 'pauta_consultada');
+    await participantEvent(db, config, now(), req.auth.userId, 'pauta_consultada');
     res.json(detailView(plan));
   });
 

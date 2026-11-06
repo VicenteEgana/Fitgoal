@@ -29,6 +29,8 @@ export function loadConfig(env = process.env, overrides = {}) {
     accessTokenSeconds: 15 * 60,
     refreshTokenDays: 7,
     rateLimit: { perMinute: 120, authFailures: 10, authWindowMinutes: 15 },
+    // Plazos de conservación publicados en docs/politica_de_datos.md: si cambian, se actualiza la política.
+    retention: { inactiveAccountDays: 365, closedSessionDays: 30, notificationDays: 180, usageEventDays: 730 },
     // Interruptor ético y legal del informe: sin habilitación del tratamiento de datos, el peso solo se registra en cuentas ficticias.
     // Los datos de la estimación energética (sexo, peso, talla y actividad) solo existen en perfiles ficticios: lo exige la base de datos.
     weightTrackingEnabled: env.WEIGHT_TRACKING_ENABLED === '1',

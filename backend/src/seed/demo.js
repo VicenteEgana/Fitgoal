@@ -181,7 +181,7 @@ export async function seedDemo(db, config) {
       const row = (await tx.query('INSERT INTO users (email, password_hash, role, is_fictitious, enrolled_at) VALUES ($1, $2, $3, $4, $5) RETURNING id', [account.email, passwordHash, account.role, account.role === 'user', account.role === 'user' ? new Date() : null])).rows[0];
       ids[key] = row.id;
     }
-    for (const purpose of ['registro_cuenta', 'perfil_entrenamiento', 'datos_corporales', 'datos_nutricionales', 'seguimiento_progreso', 'recordatorios']) {
+    for (const purpose of ['registro_cuenta', 'perfil_entrenamiento', 'datos_corporales', 'datos_nutricionales', 'seguimiento_progreso', 'recordatorios', 'evaluacion_piloto']) {
       await tx.query('INSERT INTO consents (user_id, purpose, policy_version, granted) VALUES ($1, $2, $3, true)', [ids.participant, purpose, config.policyVersion]);
     }
     for (const [code, name, description, group, minLevel, needsEquipment, prescription, source, impact] of EXERCISES) {

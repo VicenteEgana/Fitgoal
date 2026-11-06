@@ -30,7 +30,7 @@ export function p5() {
   const tuse = d.task(2, colX(6), 'Ver y usar solo lo aprobado: rutinas, ejercicios y recomendaciones');
   const endOk = d.end(2, colX(7), 'Contenido vigente para todas las personas', { color: '#2f8a4f' });
 
-  const r0 = d.start(0, colX(6), 'Decide retirar contenido', { dy: 40 });
+  const r0 = d.start(0, colX(6), 'Decide retirar contenido', { dy: 40, side: 'right' });
   const sp2 = d.sub(1, colX(6), 'SP5.2 Retiro de contenido', { dy: 70, w: 150, h: 70 });
   const endRet = d.end(1, colX(7), 'Contenido retirado', { dy: 70, color: '#c58a12' });
 
@@ -40,12 +40,13 @@ export function p5() {
   d.flow(t2, 'r', g1, 'l');
   d.flow(g1, 'r', tap, 'l', { label: 'Sí' });
   d.flow(g1, 'b', tfix, 't', { label: 'No', labelDx: 14, labelDy: 0 });
-  d.flow(tfix, 'l', t1, 'b', { offB: 40, dash: true });
+  // El ajuste vuelve a guardarse como borrador y se revisa otra vez (flujo de secuencia, no de mensaje).
+  d.flow(tfix, 'b', svc1, 'b');
   d.flow(tap, 'b', sp1, 't');
   d.flow(sp1, 'b', msg, 't');
   d.flow(msg, 'r', tuse, 'l');
   d.flow(tuse, 'r', endOk, 'l');
-  d.flow(r0, 'r', sp2, 't');
+  d.flow(r0, 'b', sp2, 't');
   d.flow(sp2, 'r', endRet, 'l');
 
   const y2 = d.lanes[2].y;

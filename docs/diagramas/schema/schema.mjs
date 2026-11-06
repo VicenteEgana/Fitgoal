@@ -609,4 +609,39 @@ CREATE TRIGGER meal_plan_swaps_valid BEFORE INSERT OR UPDATE ON meal_plan_swaps
   },
 ];
 
+// Protección de datos por tabla (no cambia el SQL; alimenta el diccionario).
+// «borrado» describe lo que hace eraseUser (backend/src/modules/datarights.js) al aplicar la eliminación de una cuenta.
+export const DATA_CLASSES = [
+  ['Identificación y acceso', 'Datos personales que identifican a la persona o le dan acceso (correo, rol, credenciales protegidas con hash).'],
+  ['Personal', 'Datos asociados a una persona identificable, sin información de salud.'],
+  ['Sensible (salud)', 'Datos relativos a la salud o al perfil biológico (estatura, peso, sexo y actividad física); FitGoal los trata como sensibles y solo con consentimiento específico.'],
+  ['Seudonimizado', 'Datos de uso sin vínculo directo con la cuenta: solo se asocian a un HMAC del identificador.'],
+  ['Trazabilidad', 'Registro de acciones con el actor y la entidad afectada, sin tokens ni contenido sensible.'],
+  ['Catálogo (no personal)', 'Contenido profesional del servicio; solo identifica al profesional autor y aprobador.'],
+];
+
+const CATALOG_KEEP = 'No aplica: el contenido no es personal. Se conserva con sus versiones; lo retirado deja de ofrecerse, pero no se borra, para mantener la trazabilidad.';
+export const DATA_PROTECTION = {
+  users: { cls: 'Identificación y acceso', detail: 'email identifica a la persona; password_hash es una credencial (Argon2id), nunca la contraseña. enrolled_at se fija al autorizar «evaluacion_piloto» y se borra al revocarlo. La cuenta real sin actividad durante 12 meses se elimina, salvo que tenga una solicitud de derechos abierta.', erase: 'Se anonimiza: el correo pasa a «eliminado-<id>@invalid», se invalida el hash, status = deleted, se registra deleted_at y se incrementa session_version. La fila se conserva para no romper la auditoría ni las solicitudes.' },
+  auth_sessions: { cls: 'Identificación y acceso', detail: 'Solo el hash SHA-256 del refresh token; vence en 7 días como máximo.', erase: 'Se borran todas las sesiones de la cuenta.' },
+  consents: { cls: 'Personal', detail: 'Finalidad, versión de la política y fecha de cada otorgamiento o revocación.', erase: 'Se borran.' },
+  data_requests: { cls: 'Personal', detail: 'Tipo de derecho, plazos y resolución; la nota de resolución no debe contener datos de salud.', erase: 'Se conservan, asociadas a la cuenta anonimizada, para responder por la solicitud y reaplicar la eliminación si se restaura un respaldo.' },
+  exercises: { cls: 'Catálogo (no personal)', detail: 'created_by y approved_by identifican al preparador.', erase: CATALOG_KEEP },
+  rule_versions: { cls: 'Catálogo (no personal)', detail: 'author_id y approved_by identifican al profesional.', erase: CATALOG_KEEP },
+  routine_templates: { cls: 'Catálogo (no personal)', detail: 'author_id y approved_by identifican al preparador.', erase: CATALOG_KEEP },
+  template_exercises: { cls: 'Catálogo (no personal)', detail: 'Composición de la plantilla.', erase: 'No aplica; sigue a su plantilla (ON DELETE CASCADE).' },
+  foods: { cls: 'Catálogo (no personal)', detail: 'author_id y approved_by identifican a la nutricionista.', erase: CATALOG_KEEP },
+  meal_plan_templates: { cls: 'Catálogo (no personal)', detail: 'author_id y approved_by identifican a la nutricionista.', erase: CATALOG_KEEP },
+  meal_plan_items: { cls: 'Catálogo (no personal)', detail: 'Composición de la pauta.', erase: 'No aplica; sigue a su pauta (ON DELETE CASCADE).' },
+  profile_versions: { cls: 'Sensible (salud)', detail: 'height_cm y weight_kg (consentimiento «datos_corporales») y sex_param y activity_level (consentimiento «datos_nutricionales») son sensibles; el resto del perfil es personal. El IMC se calcula y no se guarda. Al revocar «datos_corporales» se borran los cuatro campos en todas las versiones; al revocar «datos_nutricionales», el sexo y la actividad.', erase: 'Se borran todas las versiones.' },
+  user_plans: { cls: 'Personal', detail: 'Rutina elegida o armada y sus días.', erase: 'Se borran, con sus ejercicios (ON DELETE CASCADE).' },
+  user_plan_exercises: { cls: 'Personal', detail: 'Copia de los ejercicios aprobados de la rutina.', erase: 'Se borran con la rutina.' },
+  meal_plan_swaps: { cls: 'Personal', detail: 'Alimentos que la persona cambió en su pauta (preferencias o disponibilidad); se incluyen en la exportación.', erase: 'Se borran.' },
+  training_sessions: { cls: 'Personal', detail: 'Agenda, sesiones realizadas, cambios de día y nota breve.', erase: 'Se borran.' },
+  weight_records: { cls: 'Sensible (salud)', detail: 'weight_kg; solo con consentimiento «seguimiento_progreso» y tratamiento de datos habilitado. Se borra al revocar «seguimiento_progreso» o «datos_corporales» y con la oposición.', erase: 'Se borran.' },
+  notifications: { cls: 'Personal', detail: 'Mensajes sin información de salud. Se borran a los 6 meses.', erase: 'Se borran.' },
+  audit_log: { cls: 'Trazabilidad', detail: 'actor_id, entidad y versión; detail no guarda tokens ni contenido sensible.', erase: 'Se conserva (solo anexado); el actor queda asociado a la cuenta anonimizada.' },
+  usage_events: { cls: 'Seudonimizado', detail: 'pseudonym = HMAC-SHA256 del identificador con un secreto del piloto; no tiene clave foránea hacia users. Solo con consentimiento «evaluacion_piloto»; se borra al revocarlo y a los 24 meses.', erase: 'Se borran los eventos del seudónimo de la cuenta.' },
+};
+
 export const byName = Object.fromEntries(TABLES.map(t => [t.name, t]));

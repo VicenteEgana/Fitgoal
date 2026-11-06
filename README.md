@@ -39,12 +39,13 @@ Para recompilar la app web tras cambiar código Flutter: `.\iniciar.ps1 -Rebuild
 |---|---|
 | `backend/` | API Node.js/Express (monolito modular), migraciones SQL, semilla de demostración y 148 pruebas. Ver `backend/README.md`. |
 | `mobile/` | Cliente Flutter (web, Android) con 80 pruebas. Ver `mobile/README.md`. |
-| `docs/ES2_Arquitectura.md` | Capítulo de arquitectura generado: 5 procesos BPMN, casos de uso, componentes, modelo de datos, comunicaciones, infraestructura, trazabilidad. |
-| `docs/diccionario_de_datos.md` | Diccionario de datos de las 20 tablas, generado desde el mismo esquema que la migración. |
+| `docs/ES2_Arquitectura.md` | Capítulo de arquitectura generado, por capas: BPMN (P1, P3 y P5; P2 y P4 en anexo), capa lógica (casos de uso y componentes), capa de datos (modelo y diccionario), capa física y de red (topología, infraestructura y arquitectura integral) y trazabilidad. |
+| `docs/entrega_es2/` | Las 18 figuras del capítulo, numeradas en orden para insertarlas en el informe (`indice.md`). |
+| `docs/diccionario_de_datos.md` | Diccionario de datos de las 20 tablas: columnas, reglas, índices, relaciones, disparadores, clasificación de los datos y qué pasa al eliminar una cuenta. Se genera desde el mismo esquema que la migración. |
 | `docs/cambios_al_informe.md` | Qué debe cambiar el informe para coincidir con el producto. |
-| `docs/diagramas/` | Generador de diagramas (SVG → PNG) y del modelo de datos. `out/png` contiene los 24 diagramas. |
+| `docs/diagramas/` | Generador de diagramas (SVG → PNG) y del modelo de datos. `out/png` contiene los 25 diagramas. |
 
-El modelo de datos tiene una sola fuente (`docs/diagramas/schema/schema.mjs`) que produce el diagrama ER, `backend/migrations/001_modelo_mvp.sql` y el diccionario. `docs/diagramas/schema/validate.mjs` ejecuta 70 comprobaciones sobre PostgreSQL 18 (competencia del aprobador, solo plantillas y ejercicios aprobados en una rutina, rutinas iniciadas inmutables, auditoría solo de inserción, datos nutricionales solo en perfiles ficticios, etc.).
+El modelo de datos tiene una sola fuente (`docs/diagramas/schema/schema.mjs`) que produce el diagrama ER, `backend/migrations/001_modelo_mvp.sql` y el diccionario. `docs/diagramas/schema/validate.mjs` ejecuta 79 comprobaciones sobre PostgreSQL 18 (competencia del aprobador, solo plantillas y ejercicios aprobados en una rutina, rutinas iniciadas inmutables, auditoría solo de inserción, cambios de alimento válidos, etc.).
 
 Regenerar diagramas y documentos:
 
@@ -52,7 +53,7 @@ Regenerar diagramas y documentos:
 cd docs\diagramas
 npm ci
 node build.mjs          # diagramas (requiere Google Chrome instalado)
-node generate.mjs       # SQL, diccionario y capítulo de arquitectura
+node generate.mjs       # SQL, diccionario, capítulo de arquitectura y figuras de docs\entrega_es2
 node schema\validate.mjs
 ```
 

@@ -2,7 +2,7 @@
 // Iniciar una rutina es inmediato: lo que la persona recibe viene del catálogo que el preparador ya aprobó.
 import { Router } from 'express';
 import { fail } from '../lib/errors.js';
-import { audit, currentProfile, hasConsent, usageEvent } from '../lib/records.js';
+import { audit, currentProfile, hasConsent, participantEvent } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
 import { DAY_LABELS, addDays, daysBetween, localDate, nextWeekday } from '../lib/time.js';
 import { uuidParam } from '../lib/validate.js';
@@ -133,7 +133,7 @@ export function plansRouter(ctx) {
           scheduled += 1;
         }
       }
-      await usageEvent(tx, config, now(), req.auth.userId, 'rutina_iniciada');
+      await participantEvent(tx, config, now(), req.auth.userId, 'rutina_iniciada');
       await audit(tx, now(), { actor: req.auth, action: 'plan.started', entityType: 'plan', entityId: plan.id, version: plan.version, detail: { source, template: template ? `${template.code} v${template.version}` : null, sessions: scheduled, replaced: Boolean(previous) } });
       return { id: plan.id, version: plan.version, source, name: spec.name, sessionsScheduled: scheduled, replaced: Boolean(previous) };
     });
@@ -153,7 +153,7 @@ export function plansRouter(ctx) {
     const days = plan.days.map(Number);
     const startedOn = localDate(plan.started_at, config.timezone);
     const elapsed = daysBetween(startedOn, localDate(now(), config.timezone));
-    await usageEvent(db, config, now(), req.auth.userId, 'plan_consultado');
+    await participantEvent(db, config, now(), req.auth.userId, 'plan_consultado');
     const schedule = days.map((day, index) => ({
       day, dayLabel: DAY_LABELS[day - 1], sessionNo: index + 1, label: plan.session_labels[index],
       exercises: rows.filter(row => row.session_no === index + 1).map(row => ({ code: row.code, name: row.name, description: row.description, muscleGroup: row.muscle_group, requiresEquipment: row.requires_equipment, prescription: row.prescription })),

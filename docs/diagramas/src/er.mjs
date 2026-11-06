@@ -8,17 +8,17 @@ const ROW = 19.5;
 const moduleColor = id => THEME[MODULES.find(m => m.id === id).color];
 
 /** Relaciones derivadas de las claves foráneas del esquema (se omiten las autorreferencias). */
-export function relations() {
+export function relations({ includeSelf = false } = {}) {
   const list = [];
   for (const t of TABLES) {
     for (const col of t.columns) {
-      if (!col.fk || col.fk.t === t.name) continue;
-      list.push({ child: t.name, cols: [col.name], parent: col.fk.t, parentCols: [col.fk.c], optional: !col.nn, unique: Boolean(col.uq) || (col.pk && t.columns.filter(x => x.pk).length === 1) });
+      if (!col.fk || (col.fk.t === t.name && !includeSelf)) continue;
+      list.push({ child: t.name, cols: [col.name], parent: col.fk.t, parentCols: [col.fk.c], optional: !col.nn, unique: Boolean(col.uq) || (col.pk && t.columns.filter(x => x.pk).length === 1), onDelete: col.fk.onDelete });
     }
     for (const fk of t.fks ?? []) {
       const optional = fk.cols.some(name => !t.columns.find(col => col.name === name).nn);
       const first = t.columns.find(col => col.name === fk.cols[0]);
-      list.push({ child: t.name, cols: fk.cols, parent: fk.ref, parentCols: fk.refCols, optional, unique: Boolean(first.uq) });
+      list.push({ child: t.name, cols: fk.cols, parent: fk.ref, parentCols: fk.refCols, optional, unique: Boolean(first.uq), onDelete: fk.onDelete, desc: fk.desc });
     }
   }
   return list;
