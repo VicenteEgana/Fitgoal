@@ -31,6 +31,18 @@ export function prescriptionText({ sets, reps, seconds }, fallback) {
   return `${series} de ${seconds} segundos`;
 }
 
+/**
+ * Novedad del catálogo sobre la rutina recomendada que la persona sigue. Su rutina es una copia que no cambia sola:
+ * si el preparador aprobó otra versión, se ofrece actualizarla (con los mismos días si la versión nueva los admite);
+ * si la retiró sin reemplazo, se informa y la persona decide si la termina o elige otra.
+ */
+export async function templateUpdateFor(tx, plan, days) {
+  const current = (await tx.query("SELECT id, version, min_days, max_days FROM routine_templates WHERE code = $1 AND status = 'approved'", [plan.template_code])).rows[0];
+  if (!current) return { kind: 'retirada' };
+  if (current.id === plan.template_id) return null;
+  return { kind: 'nueva_version', templateId: current.id, version: current.version, minDays: current.min_days, maxDays: current.max_days, fitsDays: days.length >= current.min_days && days.length <= current.max_days };
+}
+
 export function plansRouter(ctx) {
   const { db, config, now } = ctx;
   const router = Router();
@@ -151,6 +163,7 @@ export function plansRouter(ctx) {
       `SELECT pe.session_no, pe.position, pe.prescription, e.code, e.name, e.description, e.muscle_group, e.requires_equipment
          FROM user_plan_exercises pe JOIN exercises e ON e.id = pe.exercise_id WHERE pe.plan_id = $1 ORDER BY pe.session_no, pe.position`, [plan.id])).rows;
     const days = plan.days.map(Number);
+    const templateUpdate = plan.template_id ? await templateUpdateFor(db, plan, days) : null;
     const startedOn = localDate(plan.started_at, config.timezone);
     const elapsed = daysBetween(startedOn, localDate(now(), config.timezone));
     await participantEvent(db, config, now(), req.auth.userId, 'plan_consultado');
@@ -168,6 +181,7 @@ export function plansRouter(ctx) {
         profileVersion: plan.profile_version,
         template: plan.template_id ? { code: plan.template_code, version: plan.template_version, name: plan.template_name, split: plan.template_split } : null,
         rulesVersion: plan.rules_version,
+        templateUpdate,
         schedule,
         week: DAY_LABELS.map((dayLabel, index) => {
           const session = schedule.find(item => item.day === index + 1);

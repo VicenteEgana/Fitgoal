@@ -5,6 +5,7 @@ import '../common.dart';
 import '../notifications_view.dart';
 import 'my_data_tab.dart';
 import 'nutrition_tab.dart';
+import 'onboarding_screen.dart';
 import 'plan_tab.dart';
 import 'profile_tab.dart';
 import 'routines_tab.dart';
@@ -19,27 +20,65 @@ class ParticipantHome extends StatefulWidget {
 }
 
 class _ParticipantHomeState extends State<ParticipantHome> {
-  static const _profile = 3;
   int _index = 0;
+  // La alimentación (RF005) se puede apagar en el servidor; mientras no se sabe, se muestra.
+  bool _nutrition = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFeatures();
+  }
+
+  Future<void> _loadFeatures() async {
+    try {
+      final data = await widget.api.get('/api/features') as Map<String, dynamic>;
+      final on = (data['features'] as Map<String, dynamic>?)?['nutrition'] != false;
+      if (mounted && on != _nutrition) {
+        setState(() {
+          _nutrition = on;
+          _index = 0;
+        });
+      }
+    } on ApiException {
+      // Sin respuesta se mantiene la pestaña; la API igual rechaza las pautas si la función está apagada.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Recién creada la cuenta se pide el perfil guiado, antes de mostrar las pestañas.
+    if (widget.api.justRegistered) {
+      return OnboardingScreen(
+        api: widget.api,
+        nutritionEnabled: _nutrition,
+        onFinished: () => setState(() {
+          widget.api.finishRegistration();
+          _index = 1;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) showMessage(context, 'Perfil listo: estas son tus rutinas recomendadas.');
+          });
+        }),
+        onSkipped: () => setState(widget.api.finishRegistration),
+      );
+    }
+    final profileIndex = _nutrition ? 3 : 2;
     final tabs = <Widget>[
-      PlanTab(key: const ValueKey('plan'), api: widget.api, onGoToProfile: () => setState(() => _index = _profile), onGoToRoutines: () => setState(() => _index = 1)),
+      PlanTab(key: const ValueKey('plan'), api: widget.api, onGoToProfile: () => setState(() => _index = profileIndex), onGoToRoutines: () => setState(() => _index = 1)),
       RoutinesTab(
         key: const ValueKey('routines'),
         api: widget.api,
-        onGoToProfile: () => setState(() => _index = _profile),
+        onGoToProfile: () => setState(() => _index = profileIndex),
         onStarted: (message) {
           setState(() => _index = 0);
           showMessage(context, message);
         },
       ),
-      NutritionTab(key: const ValueKey('nutrition'), api: widget.api, onGoToProfile: () => setState(() => _index = _profile)),
+      if (_nutrition) NutritionTab(key: const ValueKey('nutrition'), api: widget.api, onGoToProfile: () => setState(() => _index = profileIndex)),
       ProfileTab(key: const ValueKey('profile'), api: widget.api),
       MyDataTab(key: const ValueKey('mydata'), api: widget.api),
     ];
-    const titles = ['Mi rutina', 'Rutinas', 'Alimentación', 'Mi perfil', 'Mis datos'];
+    final titles = ['Mi rutina', 'Rutinas', if (_nutrition) 'Alimentación', 'Mi perfil', 'Mis datos'];
     return Scaffold(
       appBar: AppBar(title: Text(titles[_index]), actions: [
         IconButton(
@@ -54,12 +93,12 @@ class _ParticipantHomeState extends State<ParticipantHome> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.fitness_center_outlined), selectedIcon: Icon(Icons.fitness_center), label: 'Mi rutina'),
-          NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore), label: 'Rutinas'),
-          NavigationDestination(icon: Icon(Icons.restaurant_menu_outlined), selectedIcon: Icon(Icons.restaurant_menu), label: 'Alimentación'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Perfil'),
-          NavigationDestination(icon: Icon(Icons.shield_outlined), selectedIcon: Icon(Icons.shield), label: 'Mis datos'),
+        destinations: [
+          const NavigationDestination(icon: Icon(Icons.fitness_center_outlined), selectedIcon: Icon(Icons.fitness_center), label: 'Mi rutina'),
+          const NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore), label: 'Rutinas'),
+          if (_nutrition) const NavigationDestination(icon: Icon(Icons.restaurant_menu_outlined), selectedIcon: Icon(Icons.restaurant_menu), label: 'Alimentación'),
+          const NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Perfil'),
+          const NavigationDestination(icon: Icon(Icons.shield_outlined), selectedIcon: Icon(Icons.shield), label: 'Mis datos'),
         ],
       ),
     );

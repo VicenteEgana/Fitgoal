@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { WindowCounter } from './lib/rate-limit.js';
 import { ApiError, translateDatabaseError } from './lib/errors.js';
 import { createAuthenticate } from './lib/auth.js';
+import { useHealthKey } from './lib/health-data.js';
 import { identityRouters } from './modules/identity.js';
 import { profileRouter } from './modules/profile.js';
 import { catalogRouter } from './modules/catalog.js';
@@ -22,6 +23,7 @@ const WEB_BUILD = fileURLToPath(new URL('../../mobile/build/web/', import.meta.u
  * @param {{ db: object, config: object, now?: () => Date, logger?: (line: string) => void, webBuild?: string|null }} options
  */
 export function createApp({ db, config, now = () => new Date(), logger = null, webBuild = WEB_BUILD }) {
+  useHealthKey(config.dataKey);
   const app = express();
   const minute = 60 * 1000;
   const ctx = {
@@ -76,6 +78,9 @@ export function createApp({ db, config, now = () => new Date(), logger = null, w
     if (!status.allowed) throw new ApiError(429, 'RATE_LIMITED', 'Demasiadas solicitudes. Intenta de nuevo en unos segundos.', { retryAfterSeconds: status.retryAfterSeconds });
     next();
   });
+
+  // Funciones activas, para que la app oculte lo que está apagado (por ejemplo, la alimentación sin nutricionista habilitada).
+  app.get('/api/features', (_req, res) => res.json({ features: config.features }));
 
   // Rutas públicas (sin sesión): registro, inicio de sesión y renovación.
   const identity = identityRouters(ctx);

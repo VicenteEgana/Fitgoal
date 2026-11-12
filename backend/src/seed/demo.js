@@ -1,6 +1,7 @@
 // Datos de demostración: cuentas ficticias, catálogo de ejemplo y reglas aprobadas por el preparador de demostración.
 // SOLO para desarrollo y presentaciones. El contenido profesional real lo redacta y aprueba el preparador físico del proyecto.
 import { hashPassword } from '../lib/security.js';
+import { sealProfile, useHealthKey } from '../lib/health-data.js';
 import { DAY_LABELS, addDays, localDate, nextWeekday } from '../lib/time.js';
 import { FOODS, NUTRITION_RULES, REFERENCE_KCAL, normalizedMealPlans } from './nutrition.js';
 
@@ -248,10 +249,13 @@ export async function seedDemoHistory(db, config, now = new Date()) {
   const today = localDate(now, config.timezone);
   const startedOn = addDays(today, -15);
   const days = [1, 3, 5];
+  useHealthKey(config.dataKey);
+  const body = sealProfile(participant.id, { sex_param: 'femenino', weight_kg: 64, height_cm: 163, activity_level: 'ligero' });
   await db.transaction(async tx => {
     const profile = (await tx.query(
       `INSERT INTO profile_versions (user_id, version, age, objective, level, days, duration_minutes, equipment, sex_param, weight_kg, height_cm, activity_level, is_fictitious)
-       VALUES ($1, 1, 29, 'bajar', 'principiante', $2, 30, 'sin_equipo', 'femenino', 64, 163, 'ligero', true) RETURNING id`, [participant.id, days])).rows[0];
+       VALUES ($1, 1, 29, 'bajar', 'principiante', $2, 30, 'sin_equipo', $3, $4, $5, $6, true) RETURNING id`,
+      [participant.id, days, body.sex_param, body.weight_kg, body.height_cm, body.activity_level])).rows[0];
     const template = (await tx.query("SELECT * FROM routine_templates WHERE code = $1 AND status = 'approved'", [templateCode('bajar', 'principiante', 'sin_equipo', 'normal', 'full_body')])).rows[0];
     const rules = (await tx.query("SELECT id FROM rule_versions WHERE domain = 'entrenamiento' AND status = 'approved'")).rows[0];
     const labels = days.map((_, index) => template.session_labels[index % template.session_labels.length]);

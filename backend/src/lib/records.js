@@ -1,5 +1,6 @@
 import { pseudonymOf } from './security.js';
 import { bodyOf } from './body.js';
+import { openProfile } from './health-data.js';
 
 /** Registra un evento en la bitácora de solo anexado. No incluir tokens ni contenido sensible en `detail`. */
 export async function audit(tx, at, { actor = null, action, entityType, entityId = null, version = null, detail = {} }) {
@@ -63,7 +64,8 @@ export async function hasConsent(tx, userId, purpose) {
 
 export async function currentProfile(tx, userId) {
   const result = await tx.query('SELECT * FROM profile_versions WHERE user_id = $1 ORDER BY version DESC LIMIT 1', [userId]);
-  return result.rows[0] ?? null;
+  // Los datos de salud vienen cifrados de la base: se descifran solo aquí, al leerlos para usarlos.
+  return openProfile(result.rows[0] ?? null);
 }
 
 export function profileView(row) {

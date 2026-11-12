@@ -1,6 +1,7 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createContext, POLICY, PROFILE } from './helpers.js';
+import { openProfile, sealProfile } from '../src/lib/health-data.js';
 import { restingEnergy } from '../src/modules/estimates.js';
 
 describe('Perfil, objetivo y disponibilidad (RF001, RF002, OE-a)', () => {
@@ -121,10 +122,27 @@ describe('Perfil, objetivo y disponibilidad (RF001, RF002, OE-a)', () => {
     const insert = values => ctx.db.query(
       `INSERT INTO profile_versions (user_id, version, age, objective, level, days, duration_minutes, equipment, ${Object.keys(values).join(', ')})
        VALUES ($1, 1, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', ${Object.keys(values).map((_, index) => `$${index + 2}`).join(', ')})`, [real.user.id, ...Object.values(values)]);
-    await assert.rejects(insert({ sex_param: 'femenino', activity_level: 'ligero' }), /estimate_needs_body/);
-    await assert.rejects(insert({ sex_param: 'femenino', weight_kg: 60, height_cm: 165 }), /estimate_needs_body/);
-    await assert.rejects(insert({ weight_kg: 60 }), /body_pair/);
-    await assert.rejects(insert({ weight_kg: 10, height_cm: 165 }), /weight_kg_range/);
+    const sealed = sealProfile(real.user.id, { sex_param: 'femenino', weight_kg: 60, height_cm: 165, activity_level: 'ligero' });
+    await assert.rejects(insert({ sex_param: sealed.sex_param, activity_level: sealed.activity_level }), /estimate_needs_body/);
+    await assert.rejects(insert({ sex_param: sealed.sex_param, weight_kg: sealed.weight_kg, height_cm: sealed.height_cm }), /estimate_needs_body/);
+    await assert.rejects(insert({ weight_kg: sealed.weight_kg }), /body_pair/);
+    await assert.rejects(insert({ weight_kg: '60', height_cm: '165' }), /height_cm_range|weight_kg_range/, 'la base rechaza los datos de salud sin cifrar');
+  });
+
+  test('los datos de salud se guardan cifrados y solo la API los lee', async () => {
+    const participant = await ctx.register();
+    await participant.api.post('/api/consents').send({ purpose: 'datos_nutricionales', granted: true, policyVersion: POLICY });
+    const saved = await participant.api.put('/api/profiles/me').send({ ...PROFILE, sexParam: 'femenino', weightKg: 71.25, heightCm: 168, activityLevel: 'ligero' });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    assert.deepEqual([saved.body.profile.weightKg, saved.body.profile.heightCm, saved.body.profile.sexParam], [71.3, 168, 'femenino'], 'se guarda con un decimal');
+    const row = (await ctx.db.query('SELECT * FROM profile_versions WHERE user_id = $1', [participant.user.id])).rows[0];
+    for (const column of ['weight_kg', 'height_cm', 'sex_param', 'activity_level']) {
+      assert.match(row[column], /^v1\./, `${column} está cifrado`);
+      assert.ok(!/71|168|femenino|ligero/.test(row[column]), `${column} no deja ver el valor`);
+    }
+    const other = await ctx.register();
+    assert.throws(() => openProfile({ ...row, user_id: other.user.id }), 'el valor cifrado queda ligado a su titular: no sirve copiado en otra cuenta');
+    assert.deepEqual((await participant.api.get('/api/profiles/me')).body.profile.weightKg, 71.3);
   });
 
   test('un participante no puede leer ni modificar el perfil de otro', async () => {

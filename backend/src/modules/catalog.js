@@ -2,7 +2,7 @@
 // El preparador físico define y aprueba cada elemento una sola vez, con versión; las personas solo ven lo aprobado.
 import { Router } from 'express';
 import { fail } from '../lib/errors.js';
-import { audit } from '../lib/records.js';
+import { audit, notify } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
 import { uuidParam } from '../lib/validate.js';
 import { BMI_CATEGORIES } from '../lib/body.js';
@@ -159,8 +159,25 @@ function validateSplitRules(splitRules) {
   }
 }
 
+/**
+ * Avisos a quienes siguen una rutina del catálogo. No nombran la rutina: su nombre puede incluir la categoría de IMC,
+ * que es un dato de salud, y los avisos no llevan datos de salud.
+ */
+export const ROUTINE_NOTICES = {
+  newVersion: 'El preparador publicó una versión nueva de tu rutina. Puedes actualizarla en Mi rutina o seguir con la que tienes.',
+  retired: 'El preparador dejó de ofrecer tu rutina. Puedes terminarla o elegir otra en Rutinas.',
+};
+
 export function catalogRouter(ctx) {
   const { db, now } = ctx;
+
+  /** Avisa a cada persona cuya rutina vigente viene de las plantillas indicadas (alias «t»). Devuelve cuántas son. */
+  async function notifyFollowers(tx, where, params, message, refId) {
+    const followers = (await tx.query(
+      `SELECT DISTINCT p.user_id FROM user_plans p JOIN routine_templates t ON t.id = p.template_id WHERE p.status = 'vigente' AND ${where}`, params)).rows;
+    for (const row of followers) await notify(tx, now(), row.user_id, 'rutina_actualizada', message, refId);
+    return followers.length;
+  }
   const router = Router();
   const reader = requireRole('trainer', 'nutritionist', 'admin');
   const trainer = requireRole('trainer');
@@ -261,7 +278,9 @@ export function catalogRouter(ctx) {
       if (pending.length) fail(409, 'EXERCISES_NOT_APPROVED', `Aprueba antes estos ejercicios: ${pending.map(row => row.code).join(', ')}.`);
       await tx.query("UPDATE routine_templates SET status = 'retired' WHERE code = $1 AND status = 'approved'", [template.code]);
       await tx.query("UPDATE routine_templates SET status = 'approved', approved_by = $2, approved_by_role = 'trainer', approved_at = $3 WHERE id = $1", [id, req.auth.userId, now()]);
-      await audit(tx, now(), { actor: req.auth, action: 'template.approved', entityType: 'template', entityId: id, version: template.version });
+      // Quien sigue una versión anterior conserva su copia (lo iniciado no cambia solo); se le avisa y decide si actualiza.
+      const notified = await notifyFollowers(tx, "t.code = $1 AND t.id <> $2", [template.code, id], ROUTINE_NOTICES.newVersion, id);
+      await audit(tx, now(), { actor: req.auth, action: 'template.approved', entityType: 'template', entityId: id, version: template.version, detail: { notified } });
       return template;
     });
     res.json({ template: { id: approved.id, code: approved.code, version: approved.version, status: 'approved' } });
@@ -272,7 +291,8 @@ export function catalogRouter(ctx) {
     await db.transaction(async tx => {
       const result = await tx.query("UPDATE routine_templates SET status = 'retired' WHERE id = $1 AND status = 'approved'", [id]);
       if (!result.rowCount) fail(409, 'NOT_APPROVED', 'Solo se retiran plantillas aprobadas.');
-      await audit(tx, now(), { actor: req.auth, action: 'template.retired', entityType: 'template', entityId: id });
+      const notified = await notifyFollowers(tx, 't.id = $1', [id], ROUTINE_NOTICES.retired, id);
+      await audit(tx, now(), { actor: req.auth, action: 'template.retired', entityType: 'template', entityId: id, detail: { notified } });
     });
     res.json({ template: { id, status: 'retired' } });
   });

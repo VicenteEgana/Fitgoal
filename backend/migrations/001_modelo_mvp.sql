@@ -20,6 +20,12 @@ LANGUAGE sql IMMUTABLE AS $$
      AND NOT EXISTS (SELECT 1 FROM unnest(l) AS x WHERE x IS NULL OR length(btrim(x)) NOT BETWEEN 1 AND 40)
 $$;
 
+-- Valida que un dato de salud llegue cifrado por la API (AES-256-GCM, formato «v1.» y base64url con vector inicial, texto cifrado y etiqueta).
+CREATE FUNCTION fitgoal_sealed(t text) RETURNS boolean
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT t ~ '^v1[.][A-Za-z0-9_-]{38,}$'
+$$;
+
 -- users: Cuenta de acceso. Un mismo modelo cubre participantes, preparadores, nutricionistas y administradores (control de acceso por rol).
 CREATE TABLE users (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -478,8 +484,8 @@ CREATE TABLE profile_versions (
   duration_minutes integer NOT NULL,
   equipment text NOT NULL,
   sex_param text,
-  weight_kg numeric(5,1),
-  height_cm numeric(4,1),
+  weight_kg text,
+  height_cm text,
   activity_level text,
   is_fictitious boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -493,10 +499,10 @@ CREATE TABLE profile_versions (
   CONSTRAINT profile_versions_days_range CHECK (fitgoal_days_valid(days)),
   CONSTRAINT profile_versions_duration_minutes_check CHECK (duration_minutes IN (20, 30, 45, 60)),
   CONSTRAINT profile_versions_equipment_check CHECK (equipment IN ('sin_equipo', 'con_equipo')),
-  CONSTRAINT profile_versions_sex_param_check CHECK (sex_param IN ('masculino', 'femenino')),
-  CONSTRAINT profile_versions_weight_kg_range CHECK (weight_kg BETWEEN 30 AND 300),
-  CONSTRAINT profile_versions_height_cm_range CHECK (height_cm BETWEEN 100 AND 250),
-  CONSTRAINT profile_versions_activity_level_check CHECK (activity_level IN ('sedentario', 'ligero', 'moderado', 'intenso')),
+  CONSTRAINT profile_versions_sex_param_range CHECK (fitgoal_sealed(sex_param)),
+  CONSTRAINT profile_versions_weight_kg_range CHECK (fitgoal_sealed(weight_kg)),
+  CONSTRAINT profile_versions_height_cm_range CHECK (fitgoal_sealed(height_cm)),
+  CONSTRAINT profile_versions_activity_level_range CHECK (fitgoal_sealed(activity_level)),
   CONSTRAINT profile_versions_body_pair CHECK ((weight_kg IS NULL) = (height_cm IS NULL)),
   CONSTRAINT profile_versions_estimate_needs_body CHECK ((sex_param IS NULL) = (activity_level IS NULL) AND (sex_param IS NULL OR weight_kg IS NOT NULL)),
   CONSTRAINT profile_versions_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id)
@@ -511,10 +517,10 @@ COMMENT ON COLUMN profile_versions.level IS 'Nivel de experiencia declarado.';
 COMMENT ON COLUMN profile_versions.days IS 'Días disponibles (1 = lunes … 7 = domingo), sin repetir.';
 COMMENT ON COLUMN profile_versions.duration_minutes IS 'Minutos disponibles por sesión.';
 COMMENT ON COLUMN profile_versions.equipment IS 'Equipamiento disponible.';
-COMMENT ON COLUMN profile_versions.sex_param IS 'Parámetro de sexo del modelo de Mifflin-St Jeor (opcional, con el consentimiento «datos_nutricionales»; se borra si se revoca).';
-COMMENT ON COLUMN profile_versions.weight_kg IS 'Peso en kilogramos (opcional, dato de salud). Solo se guarda con el consentimiento «datos_corporales» y se borra si se revoca.';
-COMMENT ON COLUMN profile_versions.height_cm IS 'Estatura en centímetros (opcional, dato de salud). Junto al peso permite calcular el IMC.';
-COMMENT ON COLUMN profile_versions.activity_level IS 'Nivel de actividad física habitual, que fija el factor de actividad de las reglas nutricionales (opcional, con el consentimiento «datos_nutricionales»).';
+COMMENT ON COLUMN profile_versions.sex_param IS 'Parámetro de sexo del modelo de Mifflin-St Jeor: masculino o femenino (opcional, con el consentimiento «datos_nutricionales»; se borra si se revoca). Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base.';
+COMMENT ON COLUMN profile_versions.weight_kg IS 'Peso en kilogramos, entre 30 y 300 con un decimal (opcional, dato de salud). Solo se guarda con el consentimiento «datos_corporales» y se borra si se revoca. Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base.';
+COMMENT ON COLUMN profile_versions.height_cm IS 'Estatura en centímetros, entre 100 y 250 con un decimal (opcional, dato de salud). Junto al peso permite calcular el IMC. Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base.';
+COMMENT ON COLUMN profile_versions.activity_level IS 'Nivel de actividad física habitual (sedentario, ligero, moderado o intenso), que fija el factor de actividad de las reglas nutricionales (opcional, con el consentimiento «datos_nutricionales»). Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base.';
 COMMENT ON COLUMN profile_versions.is_fictitious IS 'Copia de la condición de cuenta ficticia al guardar el perfil.';
 COMMENT ON COLUMN profile_versions.created_at IS 'Fecha y hora de creación del registro.';
 
@@ -655,18 +661,18 @@ CREATE TABLE weight_records (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   recorded_on date NOT NULL,
-  weight_kg numeric(5,1) NOT NULL,
+  weight_kg text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT weight_records_pkey PRIMARY KEY (id),
   CONSTRAINT weight_records_user_day_key UNIQUE (user_id, recorded_on),
-  CONSTRAINT weight_records_weight_kg_range CHECK (weight_kg > 0 AND weight_kg <= 500),
+  CONSTRAINT weight_records_weight_kg_range CHECK (fitgoal_sealed(weight_kg)),
   CONSTRAINT weight_records_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id)
 );
 COMMENT ON TABLE weight_records IS 'Peso declarado por el participante. Solo se habilita con consentimiento de seguimiento y tratamiento de datos autorizado.';
 COMMENT ON COLUMN weight_records.id IS 'Identificador del registro.';
 COMMENT ON COLUMN weight_records.user_id IS 'Participante.';
 COMMENT ON COLUMN weight_records.recorded_on IS 'Fecha a la que corresponde el peso.';
-COMMENT ON COLUMN weight_records.weight_kg IS 'Peso en kilogramos.';
+COMMENT ON COLUMN weight_records.weight_kg IS 'Peso en kilogramos, mayor que 0 y hasta 500 con un decimal. Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base.';
 COMMENT ON COLUMN weight_records.created_at IS 'Fecha y hora de creación del registro.';
 
 -- notifications: Aviso dentro de la aplicación, sin información sensible. Se consulta por la API; no se envían notificaciones externas.
@@ -679,7 +685,7 @@ CREATE TABLE notifications (
   created_at timestamptz NOT NULL DEFAULT now(),
   read_at timestamptz,
   CONSTRAINT notifications_pkey PRIMARY KEY (id),
-  CONSTRAINT notifications_type_check CHECK (type IN ('sesiones_pendientes', 'solicitud_derechos')),
+  CONSTRAINT notifications_type_check CHECK (type IN ('sesiones_pendientes', 'solicitud_derechos', 'rutina_actualizada', 'pauta_actualizada')),
   CONSTRAINT notifications_message_range CHECK (length(message) BETWEEN 1 AND 200),
   CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id)
 );
@@ -687,7 +693,7 @@ CREATE INDEX notifications_user_recent ON notifications (user_id, created_at DES
 COMMENT ON TABLE notifications IS 'Aviso dentro de la aplicación, sin información sensible. Se consulta por la API; no se envían notificaciones externas.';
 COMMENT ON COLUMN notifications.id IS 'Identificador del aviso.';
 COMMENT ON COLUMN notifications.user_id IS 'Destinatario.';
-COMMENT ON COLUMN notifications.type IS 'Tipo de aviso: recordatorio de sesiones sin registrar o novedad de una solicitud de derechos.';
+COMMENT ON COLUMN notifications.type IS 'Tipo de aviso: recordatorio de sesiones sin registrar, novedad de una solicitud de derechos, versión nueva o retiro de la rutina que la persona sigue, o versión nueva o retiro de una pauta en la que cambió alimentos.';
 COMMENT ON COLUMN notifications.ref_id IS 'Identificador del registro al que se refiere.';
 COMMENT ON COLUMN notifications.message IS 'Texto del aviso, sin datos de salud.';
 COMMENT ON COLUMN notifications.created_at IS 'Fecha y hora de creación del registro.';

@@ -24,7 +24,6 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _busy = false;
   bool _account = false;
   bool _profileData = false;
-  bool _bodyData = false;
   bool _reminders = false;
   bool _progress = false;
   bool _pilot = false;
@@ -62,7 +61,6 @@ class _AuthScreenState extends State<AuthScreen> {
           consents: {
             'registro_cuenta': true,
             'perfil_entrenamiento': true,
-            if (_bodyData) 'datos_corporales': true,
             if (_reminders) 'recordatorios': true,
             if (_progress) 'seguimiento_progreso': true,
             if (_pilot) 'evaluacion_piloto': true,
@@ -136,7 +134,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       Text('Tratamiento de tus datos', style: Theme.of(context).textTheme.titleSmall),
                       const SizedBox(height: 4),
                       Text(
-                        'FitGoal es para personas adultas. Tus datos se usan solo para recomendarte rutinas y pautas de alimentación y llevar tu seguimiento. Política de datos: $policyVersion.',
+                        'FitGoal es para personas adultas. Tus datos se usan solo para recomendarte rutinas y pautas de alimentación y llevar tu seguimiento. Al crear la cuenta te pediremos tu perfil; la estatura y el peso son opcionales y se piden con su propio consentimiento. Política de datos: $policyVersion.',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       Align(
@@ -158,14 +156,6 @@ class _AuthScreenState extends State<AuthScreen> {
                         controlAffinity: ListTileControlAffinity.leading,
                         contentPadding: EdgeInsets.zero,
                         title: const Text('Acepto el tratamiento de los datos de mi perfil de entrenamiento (obligatorio).'),
-                      ),
-                      CheckboxListTile(
-                        key: const Key('consent-body-data'),
-                        value: _bodyData,
-                        onChanged: (value) => setState(() => _bodyData = value ?? false),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Quiero que usen mi estatura y peso para recomendarme rutinas (dato de salud, opcional).'),
                       ),
                       CheckboxListTile(
                         key: const Key('consent-reminders'),
