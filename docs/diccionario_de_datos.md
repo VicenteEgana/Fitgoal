@@ -422,10 +422,10 @@ Cada cambio del perfil crea una versión nueva. Incluye el objetivo físico, la 
 | days | smallint[] | No |  |  | Regla: fitgoal_days_valid(days) | Días disponibles (1 = lunes … 7 = domingo), sin repetir. |
 | duration_minutes | integer | No |  |  | Valores: 20, 30, 45, 60 | Minutos disponibles por sesión. |
 | equipment | text | No |  |  | Valores: sin_equipo, con_equipo | Equipamiento disponible. |
-| sex_param | text | Sí |  |  | Valores: masculino, femenino | Parámetro de sexo del modelo de Mifflin-St Jeor (opcional, con el consentimiento «datos_nutricionales»; se borra si se revoca). |
-| weight_kg | numeric(5,1) | Sí |  |  | Regla: weight_kg BETWEEN 30 AND 300 | Peso en kilogramos (opcional, dato de salud). Solo se guarda con el consentimiento «datos_corporales» y se borra si se revoca. |
-| height_cm | numeric(4,1) | Sí |  |  | Regla: height_cm BETWEEN 100 AND 250 | Estatura en centímetros (opcional, dato de salud). Junto al peso permite calcular el IMC. |
-| activity_level | text | Sí |  |  | Valores: sedentario, ligero, moderado, intenso | Nivel de actividad física habitual, que fija el factor de actividad de las reglas nutricionales (opcional, con el consentimiento «datos_nutricionales»). |
+| sex_param | text | Sí |  |  | Regla: fitgoal_sealed(sex_param) | Parámetro de sexo del modelo de Mifflin-St Jeor: masculino o femenino (opcional, con el consentimiento «datos_nutricionales»; se borra si se revoca). Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base. |
+| weight_kg | text | Sí |  |  | Regla: fitgoal_sealed(weight_kg) | Peso en kilogramos, entre 30 y 300 con un decimal (opcional, dato de salud). Solo se guarda con el consentimiento «datos_corporales» y se borra si se revoca. Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base. |
+| height_cm | text | Sí |  |  | Regla: fitgoal_sealed(height_cm) | Estatura en centímetros, entre 100 y 250 con un decimal (opcional, dato de salud). Junto al peso permite calcular el IMC. Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base. |
+| activity_level | text | Sí |  |  | Regla: fitgoal_sealed(activity_level) | Nivel de actividad física habitual (sedentario, ligero, moderado o intenso), que fija el factor de actividad de las reglas nutricionales (opcional, con el consentimiento «datos_nutricionales»). Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base. |
 | is_fictitious | boolean | No |  | false |  | Copia de la condición de cuenta ficticia al guardar el perfil. |
 | created_at | timestamptz | No |  | now() |  | Fecha y hora de creación del registro. |
 
@@ -438,7 +438,7 @@ Reglas de integridad e índices:
 
 Protección de datos:
 
-- **Clasificación:** Sensible (salud). height_cm y weight_kg (consentimiento «datos_corporales») y sex_param y activity_level (consentimiento «datos_nutricionales») son sensibles; el resto del perfil es personal. El IMC se calcula y no se guarda. Al revocar «datos_corporales» se borran los cuatro campos en todas las versiones; al revocar «datos_nutricionales», el sexo y la actividad.
+- **Clasificación:** Sensible (salud). height_cm y weight_kg (consentimiento «datos_corporales») y sex_param y activity_level (consentimiento «datos_nutricionales») son sensibles y se guardan cifrados con AES-256-GCM por la API, con la clave fuera de la base; el resto del perfil es personal. El IMC se calcula y no se guarda. Al revocar «datos_corporales» se borran los cuatro campos en todas las versiones; al revocar «datos_nutricionales», el sexo y la actividad.
 - **Al eliminar la cuenta:** Se borran todas las versiones.
 
 #### user_plans — Rutina del participante
@@ -564,7 +564,7 @@ Peso declarado por el participante. Solo se habilita con consentimiento de segui
 | id | uuid | No | PK | gen_random_uuid() |  | Identificador del registro. |
 | user_id | uuid | No | FK |  | Referencia a users.id | Participante. |
 | recorded_on | date | No |  |  |  | Fecha a la que corresponde el peso. |
-| weight_kg | numeric(5,1) | No |  |  | Regla: weight_kg > 0 AND weight_kg <= 500 | Peso en kilogramos. |
+| weight_kg | text | No |  |  | Regla: fitgoal_sealed(weight_kg) | Peso en kilogramos, mayor que 0 y hasta 500 con un decimal. Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base. |
 | created_at | timestamptz | No |  | now() |  | Fecha y hora de creación del registro. |
 
 Reglas de integridad e índices:
@@ -573,7 +573,7 @@ Reglas de integridad e índices:
 
 Protección de datos:
 
-- **Clasificación:** Sensible (salud). weight_kg; solo con consentimiento «seguimiento_progreso» y tratamiento de datos habilitado. Se borra al revocar «seguimiento_progreso» o «datos_corporales» y con la oposición.
+- **Clasificación:** Sensible (salud). weight_kg, cifrado con AES-256-GCM por la API; solo con consentimiento «seguimiento_progreso» y tratamiento de datos habilitado. Se borra al revocar «seguimiento_progreso» o «datos_corporales» y con la oposición.
 - **Al eliminar la cuenta:** Se borran.
 
 #### notifications — Aviso interno
@@ -584,7 +584,7 @@ Aviso dentro de la aplicación, sin información sensible. Se consulta por la AP
 | --- | --- | --- | --- | --- | --- | --- |
 | id | uuid | No | PK | gen_random_uuid() |  | Identificador del aviso. |
 | user_id | uuid | No | FK |  | Referencia a users.id | Destinatario. |
-| type | text | No |  |  | Valores: sesiones_pendientes, solicitud_derechos | Tipo de aviso: recordatorio de sesiones sin registrar o novedad de una solicitud de derechos. |
+| type | text | No |  |  | Valores: sesiones_pendientes, solicitud_derechos, rutina_actualizada, pauta_actualizada | Tipo de aviso: recordatorio de sesiones sin registrar, novedad de una solicitud de derechos, versión nueva o retiro de la rutina que la persona sigue, o versión nueva o retiro de una pauta en la que cambió alimentos. |
 | ref_id | uuid | Sí |  |  |  | Identificador del registro al que se refiere. |
 | message | text | No |  |  | Regla: length(message) BETWEEN 1 AND 200 | Texto del aviso, sin datos de salud. |
 | created_at | timestamptz | No |  | now() |  | Fecha y hora de creación del registro. |
@@ -596,7 +596,7 @@ Reglas de integridad e índices:
 
 Protección de datos:
 
-- **Clasificación:** Personal. Mensajes sin información de salud. Se borran a los 6 meses.
+- **Clasificación:** Personal. Mensajes sin información de salud (los avisos de rutinas no la nombran, porque su nombre puede incluir la categoría de IMC). Se borran a los 6 meses.
 - **Al eliminar la cuenta:** Se borran.
 
 #### audit_log — Auditoría

@@ -30,7 +30,7 @@ export function components() {
   s.rect(ex.x, ex.y, ex.w, ex.h, { r: 14, fill: '#fbfcfe', stroke: THEME.blue.stroke, sw: 2.2, layer: 'bg' });
   s.add('bg', textBlock(ex.x + 16, ex.y + 18, '«execution environment»  Render Web Service · Node.js 24 LTS · 0,5 CPU / 512 MB', { size: 13.5, weight: 700, anchor: 'start', fill: THEME.blue.ink }).svg);
   s.add('bg', textBlock(ex.x + 16, ex.y + 40, 'API REST FitGoal (Express 5), monolito modular', { size: 12.5, anchor: 'start', fill: THEME.sub }).svg);
-  component(s, 470, 148, 920, 92, 'Plataforma transversal', { lines: ['Validación de entradas · autenticación y autorización por rol y por relación con el recurso · límite de solicitudes · cabeceras y CORS · registros sin datos sensibles · /health'], color: THEME.violet, size: 13, sub: 11.5 });
+  component(s, 470, 148, 920, 92, 'Plataforma transversal', { lines: ['Validación de entradas · autenticación y autorización por rol y por relación con el recurso · límite de solicitudes · cabeceras y CORS · interruptor de funciones (alimentación) · registro de cada solicitud sin datos sensibles · /health'], color: THEME.violet, size: 13, sub: 11.5 });
   s.rect(462, 250, 936, 408, { r: 10, fill: '#fff', stroke: THEME.faint, sw: 1.5, dash: '6 4', layer: 'bg' });
   s.add('bg', textBlock(478, 266, 'Módulos de negocio', { size: 12.5, weight: 700, anchor: 'start', fill: THEME.sub }).svg);
   const col = i => 478 + i * 228;
@@ -38,23 +38,23 @@ export function components() {
   const mod = (c, r, title, lines, color, span = 1) => component(s, col(c), row(r), 208 + (span - 1) * 228, 94, title, { lines, color, size: 13, sub: 11 });
   const m = {
     identidad: mod(0, 0, 'Identidad', ['Registro, Argon2id, JWT y refresh rotativo, roles'], THEME.blue),
-    perfil: mod(1, 0, 'Perfil y consentimiento', ['Perfil versionado y consentimientos con política'], THEME.blue),
+    perfil: mod(1, 0, 'Perfil y consentimiento', ['Perfil versionado; datos de salud cifrados'], THEME.blue),
     catalogo: mod(2, 0, 'Catálogo', ['Ejercicios, rutinas, alimentos, pautas y reglas aprobados'], THEME.green),
-    calculo: mod(3, 0, 'Cálculo energético', ['Mifflin-St Jeor × actividad ± objetivo, con consentimiento'], THEME.green),
+    calculo: mod(3, 0, 'Cálculo calórico', ['Mifflin-St Jeor × actividad ± objetivo, en funciones puras'], THEME.green),
     derechos: mod(0, 1, 'Derechos de datos', ['Solicitudes, plazos y comprobantes'], THEME.blue),
-    recomendacion: mod(1, 1, 'Recomendación', ['Rutinas recomendadas, biblioteca y sugerencias'], THEME.amber),
-    rutinas: mod(2, 1, 'Rutinas del participante', ['Iniciar recomendada o propia, rutina vigente e historial'], THEME.amber),
-    alimentacion: mod(3, 1, 'Alimentación', ['Pautas de 7 días con gramos ajustados a las calorías'], THEME.amber),
+    recomendacion: mod(1, 1, 'Recomendación de rutinas', ['Elige rutinas aprobadas; no las genera'], THEME.amber),
+    rutinas: mod(2, 1, 'Rutinas del participante', ['Copia que no cambia sola; ofrece la versión nueva'], THEME.amber),
+    alimentacion: mod(3, 1, 'Pautas de alimentación', ['Ajusta los gramos de la pauta aprobada a las calorías'], THEME.amber),
     auditoria: mod(0, 2, 'Auditoría', ['Bitácora de solo anexado; la usan Identidad, Perfil, Catálogo, Rutinas, Progreso y Derechos'], THEME.violet, 2),
     progreso: mod(2, 2, 'Progreso', ['Horario, sesiones y cambio de día, peso, adherencia y racha'], THEME.amber),
-    notif: mod(3, 2, 'Notificaciones', ['Avisos internos sin datos sensibles'], THEME.violet),
+    notif: mod(3, 2, 'Notificaciones', ['Avisos internos sin datos de salud'], THEME.violet),
   };
-  component(s, 470, 676, 920, 84, 'Acceso a datos', { lines: ['Repositorios con SQL parametrizado, transacciones, pool de conexiones acotado y migraciones versionadas'], color: THEME.gray, size: 13, sub: 11.5 });
+  component(s, 470, 676, 920, 84, 'Acceso a datos', { lines: ['SQL parametrizado en cada módulo (db.js, sin ORM), transacciones, pool de conexiones acotado y migración generada del esquema documentado'], color: THEME.gray, size: 13, sub: 11.5 });
   const pg = component(s, 650, 870, 480, 120, 'PostgreSQL 18 (Render, gestionado)', { stereotype: 'database', lines: ['20 tablas en 4 módulos, con claves foráneas, restricciones y disparadores · 0,1 CPU · 256 MB · 1 GB de almacenamiento'], color: THEME.teal, size: 14, sub: 12 });
   const backup = component(s, 1180, 870, 230, 120, 'Job de respaldo', { stereotype: 'cron job', lines: ['pg_dump diario, cifrado AES-256'], color: THEME.gray, size: 13.5 });
   const store = component(s, 1450, 870, 200, 120, 'Almacenamiento externo', { stereotype: 'external system', lines: ['Compatible con S3, cifrado en reposo'], color: THEME.gray, size: 13, dash: '6 4' });
   const probe = component(s, 1450, 130, 200, 100, 'Sondeo externo', { stereotype: 'external system', lines: ['GET /health cada 5 min'], color: THEME.gray, size: 13.5, dash: '6 4' });
-  const ci = component(s, 1450, 290, 200, 130, 'GitHub y Actions', { stereotype: 'external system', lines: ['Repositorio, tablero y CI: análisis y pruebas por cada cambio'], color: THEME.gray, size: 13.5, dash: '6 4' });
+  const ci = component(s, 1450, 290, 200, 130, 'GitHub y Actions', { stereotype: 'external system', lines: ['Repositorio, tablero y CI (ci.yml): pruebas de API, modelo y app por cada cambio'], color: THEME.gray, size: 13.5, dash: '6 4' });
 
   // App → plataforma (etiqueta girada sobre el tramo vertical)
   solid(s, [[332, app[2].cy], [400, app[2].cy], [400, 191], [470, 191]], null);

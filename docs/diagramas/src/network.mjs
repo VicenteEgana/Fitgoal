@@ -109,9 +109,9 @@ export function infrastructure() {
   const api = nodeBox(s, 625, 380, 330, 200, 'Servicio web de la API', { stereotype: 'execution environment', lines: ['0,5 CPU · 512 MB de RAM', 'Node.js 24 LTS · Express 5', 'Despliegue automático tras aprobar la integración continua'], color: THEME.amber });
   const db = nodeBox(s, 985, 380, 330, 200, 'PostgreSQL 18 gestionado', { stereotype: 'database', lines: ['0,1 CPU · 256 MB de RAM', '1 GB de almacenamiento', 'Conexión con TLS y respaldo propio del proveedor'], color: THEME.teal });
   const cron = nodeBox(s, 985, 640, 330, 170, 'Job de respaldo diario', { stereotype: 'cron job', lines: ['pg_dump de solo lectura y cifrado AES-256', 'Siete copias diarias y cuatro semanales'], color: THEME.gray });
-  artifact(s, 625, 640, 330, 170, 'Secretos y variables por ambiente', ['JWT, HMAC de seudónimos y cadena de conexión', 'Nunca en el repositorio', 'Rotación al cambiar de responsable de operación'], { color: THEME.violet });
+  artifact(s, 625, 640, 330, 170, 'Secretos y variables por ambiente', ['JWT, HMAC de seudónimos, clave de cifrado de los datos de salud y cadena de conexión', 'Nunca en el repositorio ni en los respaldos', 'Rotación al cambiar de responsable de operación'], { color: THEME.violet });
 
-  artifact(s, 1440, 100, 245, 170, 'Estado de la infraestructura', ['Hoy: la app, la API y PostgreSQL en proceso corren y se prueban en las estaciones de desarrollo.', 'Para el piloto: Render, respaldo externo, sondeo, GitHub Actions, k6 y Google Play.'], { color: THEME.white });
+  artifact(s, 1440, 100, 245, 170, 'Estado de la infraestructura', ['Hoy: la app, la API y PostgreSQL en proceso corren y se prueban en las estaciones de desarrollo; la integración continua está definida en el repositorio.', 'Para el piloto: Render, respaldo externo, sondeo, k6 y Google Play.'], { color: THEME.white });
   const probe = nodeBox(s, 1440, 340, 230, 150, 'Sondeo externo', { stereotype: 'cloud', lines: ['GET /health cada 5 minutos'] });
   const store = nodeBox(s, 1440, 640, 230, 170, 'Almacenamiento externo', { stereotype: 'cloud', lines: ['Compatible con S3', 'Cifrado en reposo; claves separadas'] });
 

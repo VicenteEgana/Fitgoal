@@ -51,6 +51,7 @@ export function p5() {
 
   const y2 = d.lanes[2].y;
   d.note(colX(0) - 40, y2 + 24, 'La competencia la exige la base de datos: el preparador aprueba ejercicios, rutinas y reglas de entrenamiento; la nutricionista, alimentos, pautas de alimentación y reglas de nutrición (RF006). Nadie aprueba contenido ajeno a su ámbito.', { w: 560 });
+  d.note(580, y2 + 24, 'Sin un profesional habilitado, su contenido queda en borrador y no se ofrece. Sin nutricionista, la app informa que aún no hay pautas aprobadas y las rutinas siguen disponibles.', { w: 300 });
   return { id: 'P5', file: 'bpmn-p5-catalogo-profesional', title: 'P5 Gobierno del catálogo', svg: d.toString(), width: d.width, height: d.height };
 }
 
@@ -59,7 +60,7 @@ export function p5Sub() {
     code: 'P5',
     title: 'Subprocesos expandidos',
     subtitle: 'SP5.1 Publicación de contenido aprobado · SP5.2 Retiro de contenido',
-    width: 1500,
+    width: 1560,
     sheet: true,
     lanes: [
       { name: 'SP5.1 Publicación de contenido aprobado', note: 'RF004, RF006, RF010 · K5', h: 250 },
@@ -82,12 +83,13 @@ export function p5Sub() {
   const a4 = d.task(0, x(4), 'Transacción: retirar la versión anterior y aprobar la nueva', { ...svc, w: 156, h: 74 });
   const a5 = d.task(0, x(5), 'Registrar aprobador, rol y fecha de aprobación', { ...svc, w: 150 });
   const a6 = d.task(0, x(6), 'Registrar auditoría: autor, fecha y versión', { ...svc, w: 150 });
-  const a7 = d.end(0, x(7), 'Contenido aprobado y vigente', { dy: main, color: '#2f8a4f' });
+  const a6b = d.task(0, x(7), 'Avisar a quien sigue la versión anterior: su copia no cambia y decide si actualiza', { ...svc, w: 156, h: 84 });
+  const a7 = d.end(0, x(8), 'Contenido aprobado y vigente', { dy: main, color: '#2f8a4f' });
   d.flow(a0, 'r', a1, 'l'); d.flow(a1, 'r', a2, 'l'); d.flow(a2, 'r', a3, 'l', { label: 'Sí' });
   d.flow(a2, 'b', a2n, 't', { label: 'No', labelDx: 14, labelDy: 0 });
   d.flow(a3, 'r', a4, 'l', { label: 'Sí' });
   d.flow(a3, 'b', a3n, 't', { label: 'No', labelDx: 14, labelDy: 0 });
-  d.flow(a4, 'r', a5, 'l'); d.flow(a5, 'r', a6, 'l'); d.flow(a6, 'r', a7, 'l');
+  d.flow(a4, 'r', a5, 'l'); d.flow(a5, 'r', a6, 'l'); d.flow(a6, 'r', a6b, 'l'); d.flow(a6b, 'r', a7, 'l');
 
   // SP5.2
   const b0 = d.start(1, x(0), null, { dy: main });
@@ -95,7 +97,7 @@ export function p5Sub() {
   const b2 = d.gateway(1, x(2), 'xor', '¿Es un ejercicio usado por una rutina aprobada?', { dy: main, labelW: 150 });
   const b2n = d.end(1, x(2), 'Rechazar: retirar antes esas rutinas (409)', { dy: branch, side: 'right', color: '#c58a12' });
   const b3 = d.task(1, x(3), 'Marcar como retirado: solo deja de ofrecerse', { ...svc, w: 150 });
-  const b4 = d.task(1, x(4), 'Conservar sin cambios las rutinas ya iniciadas', { ...svc, w: 150 });
+  const b4 = d.task(1, x(4), 'Conservar las rutinas ya iniciadas y avisar a quien la sigue', { ...svc, w: 150, h: 74 });
   const b5 = d.task(1, x(5), 'Registrar auditoría', svc);
   const b6 = d.end(1, x(6), 'Contenido retirado', { dy: main, color: '#c0394b' });
   d.flow(b0, 'r', b1, 'l'); d.flow(b1, 'r', b2, 'l');

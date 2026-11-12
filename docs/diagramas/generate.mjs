@@ -328,7 +328,7 @@ ${img('ar-3-infraestructura', 'Diagrama de infraestructura')}
 
 ${table(['Ambiente', 'Dónde corre', 'Datos', 'Secretos y accesos', 'Uso y condición'], ENVIRONMENTS)}
 
-Hoy la app, la API y PostgreSQL en proceso (PGlite) corren y se prueban en las estaciones de desarrollo; Render, el respaldo externo, el sondeo, GitHub Actions, las pruebas de carga con k6 y la distribución por Google Play corresponden al piloto. Las cifras de CPU, memoria y almacenamiento corresponden a las tarifas públicas consultadas el 1 de octubre de 2026 y a las condiciones del presupuesto del informe; deben confirmarse al contratar. La región es Virginia, en Estados Unidos, por tener la menor latencia desde Chile (\`docs/evidencia_es2/latencia_regiones.txt\`); Render no permite cambiarla en un servicio ya creado.
+Hoy la app, la API y PostgreSQL en proceso (PGlite) corren y se prueban en las estaciones de desarrollo; la integración continua está definida en \`.github/workflows/ci.yml\` y corre en GitHub con cada cambio. Render, el respaldo externo, el sondeo, las pruebas de carga con k6 en Render y la distribución por Google Play corresponden al piloto. Las cifras de CPU, memoria y almacenamiento corresponden a las tarifas públicas consultadas el 1 de octubre de 2026 y a las condiciones del presupuesto del informe; deben confirmarse al contratar. La región es Virginia, en Estados Unidos, por tener la menor latencia desde Chile (\`docs/evidencia_es2/latencia_regiones.txt\`); Render no permite cambiarla en un servicio ya creado.
 
 ### 5.3 Arquitectura TI integral
 
