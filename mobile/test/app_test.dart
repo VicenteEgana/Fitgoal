@@ -288,17 +288,17 @@ void main() {
       expect(find.byKey(const Key('auth-error')), findsOneWidget);
       expect(server.calledTo('POST', '/api/auth/register'), isEmpty);
 
+      expect(find.byKey(const Key('consent-body-data')), findsNothing, reason: 'la estatura y el peso se piden en el perfil guiado, con su consentimiento');
       await press(tester, find.byKey(const Key('consent-account')));
       await press(tester, find.byKey(const Key('consent-profile')));
-      await press(tester, find.byKey(const Key('consent-body-data')));
       await press(tester, find.byKey(const Key('consent-reminders')));
       await press(tester, find.byKey(const Key('submit')));
       await tester.pumpAndSettle();
       final body = server.calledTo('POST', '/api/auth/register').single.body!;
       expect(body['policyVersion'], 'politica-datos-2026-10-v1');
-      expect(body['consents'], {'registro_cuenta': true, 'perfil_entrenamiento': true, 'datos_corporales': true, 'recordatorios': true});
+      expect(body['consents'], {'registro_cuenta': true, 'perfil_entrenamiento': true, 'recordatorios': true});
       expect(body['intentId'], hasLength(36));
-      expect(find.byKey(const Key('no-plan')), findsOneWidget);
+      expect(find.byKey(const Key('onb-progress')), findsOneWidget, reason: 'al crear la cuenta empieza el perfil guiado');
     });
 
     testWidgets('rechaza correos y contraseñas inválidos antes de llamar a la API', (tester) async {
@@ -391,6 +391,128 @@ void main() {
     await signIn(tester);
     return server;
   }
+
+  group('Perfil guiado al crear la cuenta (RF001, RF002, K1)', () {
+    String? sentIntent;
+    /// Crea una cuenta y deja la app en el primer paso del perfil guiado.
+    Future<FakeServer> registered(WidgetTester tester, {List<Map<String, dynamic>> consents = const []}) async {
+      final server = FakeServer()
+        ..on('POST', '/api/public/registration-started', (_, _) => {})
+        ..on('POST', '/api/auth/register', (_, _) => FakeResponse(201, session('user')))
+        ..get('/api/consents', {'policyVersion': 'politica-datos-2026-10-v1', 'consents': consents})
+        ..on('POST', '/api/consents', (_, body) => FakeResponse(201, body))
+        ..on('PUT', '/api/profiles/me', (request, body) {
+          sentIntent = request.url.queryParameters['intent'];
+          return {'profile': profile()};
+        });
+      planRoutes(server, profileData: profile());
+      routinesRoutes(server, routines: [routineData()], profileData: profile());
+      await pumpApp(tester, server);
+      await press(tester, find.byKey(const Key('switch-mode')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('email')), 'nueva@prueba.cl');
+      await tester.enterText(find.byKey(const Key('password')), 'Clave-de-prueba-2026');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await press(tester, find.byKey(const Key('consent-account')));
+      await press(tester, find.byKey(const Key('consent-profile')));
+      await press(tester, find.byKey(const Key('submit')));
+      await tester.pumpAndSettle();
+      return server;
+    }
+
+    Future<void> next(WidgetTester tester) async {
+      await press(tester, find.byKey(const Key('onb-next')));
+      await tester.pumpAndSettle();
+    }
+
+    /// Objetivo, experiencia, días y edad: los pasos obligatorios.
+    Future<void> basics(WidgetTester tester) async {
+      await press(tester, find.byKey(const Key('onb-objective-mantener')));
+      await next(tester);
+      await press(tester, find.byKey(const Key('onb-level-con_experiencia')));
+      await press(tester, find.byKey(const Key('onb-equipment-con_equipo')));
+      await next(tester);
+      await press(tester, find.byKey(const Key('onb-day-2')));
+      await press(tester, find.byKey(const Key('onb-day-4')));
+      await press(tester, find.byKey(const Key('onb-duration-45')));
+      await next(tester);
+      await tester.enterText(find.byKey(const Key('onb-age')), '34');
+      await next(tester);
+    }
+
+    testWidgets('pide objetivo, experiencia, días, edad, estatura y peso, y guarda el perfil con su consentimiento', (tester) async {
+      final server = await registered(tester);
+      expect(find.text('¿Cuál es tu objetivo?'), findsOneWidget);
+      await basics(tester);
+      expect(find.text('Tu estatura y tu peso'), findsOneWidget);
+      expect(find.text('Omitir'), findsOneWidget, reason: 'la estatura y el peso son opcionales');
+      await press(tester, find.byKey(const Key('onb-consent-body')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('onb-height')), '172');
+      await tester.enterText(find.byKey(const Key('onb-weight')), '70,5');
+      await next(tester);
+      expect(find.text('Tus calorías'), findsOneWidget);
+      await next(tester);
+      expect(find.text('Revisa tu perfil'), findsOneWidget);
+      expect(find.text('172 cm · 70,5 kg'), findsOneWidget);
+      await press(tester, find.byKey(const Key('onb-save')));
+      await tester.pumpAndSettle();
+
+      expect(server.calledTo('POST', '/api/consents').map((call) => call.body), [
+        {'purpose': 'datos_corporales', 'granted': true, 'policyVersion': 'politica-datos-2026-10-v1'},
+      ], reason: 'el consentimiento se pide en el paso donde se piden los datos y se registra antes de guardarlos');
+      final saved = server.calledTo('PUT', '/api/profiles/me').single.body!;
+      expect(saved, {'age': 34, 'objective': 'mantener', 'level': 'con_experiencia', 'days': [2, 4], 'durationMinutes': 45, 'equipment': 'con_equipo', 'weightKg': 70.5, 'heightCm': 172.0});
+      expect(sentIntent, server.calledTo('POST', '/api/public/registration-started').single.body!['intentId'], reason: 'el primer perfil cierra el intento de registro que mide K1');
+      expect(find.text('Perfil listo: estas son tus rutinas recomendadas.'), findsOneWidget);
+      expect(find.byKey(const Key('onb-progress')), findsNothing);
+    });
+
+    testWidgets('sin estatura ni peso no pide consentimiento ni calorías, y lo dice en el resumen', (tester) async {
+      final server = await registered(tester);
+      await basics(tester);
+      await next(tester);
+      expect(find.text('Revisa tu perfil'), findsOneWidget, reason: 'sin estatura y peso no hay paso de calorías');
+      expect(find.textContaining('rutinas generales de bajo impacto'), findsOneWidget);
+      await press(tester, find.byKey(const Key('onb-save')));
+      await tester.pumpAndSettle();
+      expect(server.calledTo('POST', '/api/consents'), isEmpty);
+      expect(server.calledTo('PUT', '/api/profiles/me').single.body!.containsKey('weightKg'), isFalse);
+    });
+
+    testWidgets('no avanza sin objetivo, días o una edad adulta, y valida la estatura y el peso', (tester) async {
+      await registered(tester);
+      await next(tester);
+      expect(find.text('Elige tu objetivo.'), findsOneWidget);
+      await press(tester, find.byKey(const Key('onb-objective-bajar')));
+      await next(tester);
+      await next(tester);
+      await next(tester);
+      expect(find.text('Elige al menos un día.'), findsOneWidget);
+      await press(tester, find.byKey(const Key('onb-day-1')));
+      await next(tester);
+      await tester.enterText(find.byKey(const Key('onb-age')), '17');
+      await next(tester);
+      expect(find.textContaining('FitGoal es para personas adultas'), findsWidgets);
+      await tester.enterText(find.byKey(const Key('onb-age')), '40');
+      await next(tester);
+      await press(tester, find.byKey(const Key('onb-consent-body')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('onb-height')), '90');
+      await tester.enterText(find.byKey(const Key('onb-weight')), '60');
+      await next(tester);
+      expect(find.text('La estatura debe estar entre 100 y 250 cm.'), findsOneWidget);
+    });
+
+    testWidgets('«Más tarde» deja el perfil para después y entra a la app', (tester) async {
+      final server = await registered(tester);
+      await press(tester, find.byKey(const Key('onb-later')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('onb-progress')), findsNothing);
+      expect(server.calledTo('PUT', '/api/profiles/me'), isEmpty);
+    });
+  });
 
   group('Mi rutina del participante (RF004, RF006, RF007)', () {
     testWidgets('sin rutina invita a ver rutinas y, sin perfil, a completarlo', (tester) async {
@@ -648,6 +770,43 @@ void main() {
       await press(tester, find.byKey(const Key('see-routines')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('build-routine')), findsOneWidget);
+    });
+
+    testWidgets('si el preparador publicó una versión nueva, la rutina sigue igual y se puede actualizar con los mismos días', (tester) async {
+      late FakeServer api;
+      await signedIn(tester, (server) {
+        api = server;
+        planRoutes(server, plan: {...planData(), 'templateUpdate': {'kind': 'nueva_version', 'templateId': 't-2', 'version': 2, 'minDays': 2, 'maxDays': 3, 'fitsDays': true}}, profileData: profile());
+        server.on('POST', '/api/plans/start', (_, body) => FakeResponse(201, {'plan': {'id': 'pl-2', 'version': 2}}));
+      });
+      await reveal(tester, find.byKey(const Key('template-update')));
+      expect(find.textContaining('La tuya sigue igual hasta que decidas actualizarla'), findsOneWidget);
+      await press(tester, find.byKey(const Key('update-template')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('tus mismos días'), findsOneWidget);
+      await press(tester, find.byKey(const Key('confirm-template-update')));
+      await tester.pumpAndSettle();
+      final call = api.calledTo('POST', '/api/plans/start').single;
+      expect(call.body, {'source': 'recomendada', 'templateId': 't-2', 'days': [1, 3]});
+      expect(find.text('Listo: desde mañana sigues la versión 2.'), findsOneWidget);
+    });
+
+    testWidgets('si el preparador retiró la rutina lo informa y ofrece ver otras, sin botón para actualizar', (tester) async {
+      await signedIn(tester, (server) => planRoutes(server, plan: {...planData(), 'templateUpdate': {'kind': 'retirada'}}, profileData: profile()));
+      await reveal(tester, find.byKey(const Key('template-update')));
+      expect(find.textContaining('dejó de ofrecer esta rutina'), findsOneWidget);
+      expect(find.byKey(const Key('update-template')), findsNothing);
+      expect(find.byKey(const Key('update-see-routines')), findsOneWidget);
+    });
+
+    testWidgets('con la alimentación apagada en el servidor no aparece su pestaña', (tester) async {
+      await signedIn(tester, (server) {
+        planRoutes(server, profileData: profile());
+        server.get('/api/features', {'features': {'nutrition': false}});
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('Alimentación'), findsNothing);
+      expect(find.text('Perfil'), findsOneWidget);
     });
 
     testWidgets('un error de red se informa con la opción de reintentar y no finge que algo se guardó', (tester) async {

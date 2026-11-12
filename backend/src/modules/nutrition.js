@@ -2,7 +2,7 @@
 // (déficit, mantenimiento o superávit), y el catálogo nutricional (alimentos y pautas) que gestiona la nutricionista.
 import { Router } from 'express';
 import { fail } from '../lib/errors.js';
-import { audit, currentProfile, hasConsent, participantEvent } from '../lib/records.js';
+import { audit, currentProfile, hasConsent, notify, participantEvent } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
 import { uuidParam } from '../lib/validate.js';
 import { bodyOf } from '../lib/body.js';
@@ -163,10 +163,49 @@ function validateMealPlan(body) {
   return body;
 }
 
+/**
+ * Al aprobar una versión nueva de una pauta, la persona ve esa versión. Sus cambios de alimentos se trasladan cuando siguen
+ * siendo válidos: el mismo alimento original en la misma comida y posición, y el reemplazo aprobado, del mismo grupo y presente
+ * en la versión nueva (las mismas condiciones que exige el disparador fitgoal_meal_swap_valid). Se avisa a cada persona.
+ */
+export async function carrySwaps(tx, previousIds, newId, name, at) {
+  const carried = (await tx.query(
+    `INSERT INTO meal_plan_swaps (user_id, template_id, day_no, meal, position, food_id, created_at)
+     SELECT s.user_id, $2, s.day_no, s.meal, s.position, s.food_id, s.created_at
+       FROM meal_plan_swaps s
+       JOIN meal_plan_items oi ON (oi.template_id, oi.day_no, oi.meal, oi.position) = (s.template_id, s.day_no, s.meal, s.position)
+       JOIN meal_plan_items ni ON (ni.template_id, ni.day_no, ni.meal, ni.position) = ($2, s.day_no, s.meal, s.position) AND ni.food_id = oi.food_id
+       JOIN foods orig ON orig.id = oi.food_id
+       JOIN foods repl ON repl.id = s.food_id AND repl.status = 'approved' AND repl.category = orig.category AND repl.id <> orig.id
+      WHERE s.template_id = ANY($1) AND EXISTS (SELECT 1 FROM meal_plan_items x WHERE x.template_id = $2 AND x.food_id = s.food_id)
+     ON CONFLICT DO NOTHING
+     RETURNING user_id`, [previousIds, newId])).rows;
+  const before = (await tx.query('SELECT user_id, count(*)::int AS n FROM meal_plan_swaps WHERE template_id = ANY($1) GROUP BY user_id', [previousIds])).rows;
+  const keptBy = new Map();
+  for (const row of carried) keptBy.set(row.user_id, (keptBy.get(row.user_id) ?? 0) + 1);
+  for (const row of before) {
+    const kept = keptBy.get(row.user_id) ?? 0;
+    const message = kept === row.n
+      ? `La nutricionista actualizó la pauta «${name}». Tus cambios de alimentos se mantienen.`
+      : `La nutricionista actualizó la pauta «${name}». ${kept ? 'Parte de tus cambios de alimentos ya no aplica' : 'Tus cambios de alimentos ya no aplican'}: revísala.`;
+    await notify(tx, at, row.user_id, 'pauta_actualizada', message, newId);
+  }
+  const total = before.reduce((sum, row) => sum + row.n, 0);
+  return { users: before.length, kept: carried.length, dropped: total - carried.length };
+}
+
+/** Interruptor de RF005: con la alimentación apagada, la persona no recibe pautas ni calorías; el catálogo se conserva. */
+export function nutritionEnabled(config) {
+  return (_req, _res, next) => {
+    if (!config.features.nutrition) fail(503, 'FEATURE_DISABLED', 'La alimentación no está disponible por ahora.');
+    next();
+  };
+}
+
 export function nutritionRouter(ctx) {
   const { db, config, now } = ctx;
   const router = Router();
-  const participant = requireRole('user');
+  const participant = [requireRole('user'), nutritionEnabled(config)];
   const reader = requireRole('nutritionist', 'trainer', 'admin');
   const nutritionist = requireRole('nutritionist');
 
@@ -328,13 +367,14 @@ export function nutritionRouter(ctx) {
   router.post('/catalog/meal-plans/:id/approve', nutritionist, async (req, res) => {
     const id = uuidParam(req.params.id, 'pauta');
     const approved = await db.transaction(async tx => {
-      const template = (await tx.query("SELECT id, code, version FROM meal_plan_templates WHERE id = $1 AND status = 'draft' FOR UPDATE", [id])).rows[0];
+      const template = (await tx.query("SELECT id, code, version, name FROM meal_plan_templates WHERE id = $1 AND status = 'draft' FOR UPDATE", [id])).rows[0];
       if (!template) fail(409, 'NOT_A_DRAFT', 'Solo se aprueban pautas en borrador.');
       const pending = (await tx.query("SELECT DISTINCT f.code FROM meal_plan_items i JOIN foods f ON f.id = i.food_id WHERE i.template_id = $1 AND f.status <> 'approved' ORDER BY f.code", [id])).rows;
       if (pending.length) fail(409, 'FOODS_NOT_APPROVED', `Aprueba antes estos alimentos: ${pending.map(row => row.code).join(', ')}.`);
-      await tx.query("UPDATE meal_plan_templates SET status = 'retired' WHERE code = $1 AND status = 'approved'", [template.code]);
+      const previous = (await tx.query("UPDATE meal_plan_templates SET status = 'retired' WHERE code = $1 AND status = 'approved' RETURNING id", [template.code])).rows.map(row => row.id);
       await tx.query("UPDATE meal_plan_templates SET status = 'approved', approved_by = $2, approved_by_role = 'nutritionist', approved_at = $3 WHERE id = $1", [id, req.auth.userId, now()]);
-      await audit(tx, now(), { actor: req.auth, action: 'meal_plan.approved', entityType: 'meal_plan', entityId: id, version: template.version });
+      const swaps = previous.length ? await carrySwaps(tx, previous, id, template.name, now()) : { users: 0, kept: 0, dropped: 0 };
+      await audit(tx, now(), { actor: req.auth, action: 'meal_plan.approved', entityType: 'meal_plan', entityId: id, version: template.version, detail: { swaps } });
       return template;
     });
     res.json({ mealPlan: { id: approved.id, code: approved.code, version: approved.version, status: 'approved' } });
@@ -343,9 +383,11 @@ export function nutritionRouter(ctx) {
   router.post('/catalog/meal-plans/:id/retire', nutritionist, async (req, res) => {
     const id = uuidParam(req.params.id, 'pauta');
     await db.transaction(async tx => {
-      const result = await tx.query("UPDATE meal_plan_templates SET status = 'retired' WHERE id = $1 AND status = 'approved'", [id]);
+      const result = await tx.query("UPDATE meal_plan_templates SET status = 'retired' WHERE id = $1 AND status = 'approved' RETURNING name", [id]);
       if (!result.rowCount) fail(409, 'NOT_APPROVED', 'Solo se retiran pautas aprobadas.');
-      await audit(tx, now(), { actor: req.auth, action: 'meal_plan.retired', entityType: 'meal_plan', entityId: id });
+      const users = (await tx.query('SELECT DISTINCT user_id FROM meal_plan_swaps WHERE template_id = $1', [id])).rows;
+      for (const row of users) await notify(tx, now(), row.user_id, 'pauta_actualizada', `La nutricionista dejó de ofrecer la pauta «${result.rows[0].name}», en la que cambiaste alimentos.`, id);
+      await audit(tx, now(), { actor: req.auth, action: 'meal_plan.retired', entityType: 'meal_plan', entityId: id, detail: { notified: users.length } });
     });
     res.json({ mealPlan: { id, status: 'retired' } });
   });

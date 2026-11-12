@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { fail } from '../lib/errors.js';
 import { audit, hasConsent, participantEvent } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
+import { openWeight, sealWeight } from '../lib/health-data.js';
 import { DAY_LABELS, addDays, isoWeekday, localDate, weekStart } from '../lib/time.js';
 import { isIsoDate, uuidParam } from '../lib/validate.js';
 import { dayStatuses, planCoverage, streakSummary } from '../lib/streak.js';
@@ -197,7 +198,7 @@ export function progressRouter(ctx) {
         const gate = await weightAllowed(tx, req.auth);
         if (!gate.allowed) weightRejected = gate.reason;
         else {
-          await tx.query('INSERT INTO weight_records (user_id, recorded_on, weight_kg) VALUES ($1, $2, $3) ON CONFLICT (user_id, recorded_on) DO UPDATE SET weight_kg = EXCLUDED.weight_kg', [req.auth.userId, today(), weightKg]);
+          await tx.query('INSERT INTO weight_records (user_id, recorded_on, weight_kg) VALUES ($1, $2, $3) ON CONFLICT (user_id, recorded_on) DO UPDATE SET weight_kg = EXCLUDED.weight_kg', [req.auth.userId, today(), sealWeight(req.auth.userId, weightKg)]);
           await participantEvent(tx, config, now(), req.auth.userId, 'peso_registrado');
         }
       }
@@ -211,7 +212,7 @@ export function progressRouter(ctx) {
     const gate = await weightAllowed(db, req.auth);
     if (!gate.allowed) return res.json({ enabled: false, reason: gate.reason, weights: [] });
     const rows = (await db.query('SELECT recorded_on, weight_kg FROM weight_records WHERE user_id = $1 ORDER BY recorded_on DESC LIMIT 120', [req.auth.userId])).rows;
-    res.json({ enabled: true, weights: rows.map(row => ({ recordedOn: iso(row.recorded_on), weightKg: Number(row.weight_kg) })) });
+    res.json({ enabled: true, weights: rows.map(row => ({ recordedOn: iso(row.recorded_on), weightKg: openWeight(req.auth.userId, row.weight_kg) })) });
   });
 
   router.post('/weights/me', participant, async (req, res) => {
@@ -222,7 +223,7 @@ export function progressRouter(ctx) {
     await db.transaction(async tx => {
       const gate = await weightAllowed(tx, req.auth);
       if (!gate.allowed) fail(403, 'WEIGHT_NOT_ENABLED', gate.reason);
-      await tx.query('INSERT INTO weight_records (user_id, recorded_on, weight_kg) VALUES ($1, $2, $3) ON CONFLICT (user_id, recorded_on) DO UPDATE SET weight_kg = EXCLUDED.weight_kg', [req.auth.userId, date, weightKg]);
+      await tx.query('INSERT INTO weight_records (user_id, recorded_on, weight_kg) VALUES ($1, $2, $3) ON CONFLICT (user_id, recorded_on) DO UPDATE SET weight_kg = EXCLUDED.weight_kg', [req.auth.userId, date, sealWeight(req.auth.userId, weightKg)]);
       await participantEvent(tx, config, now(), req.auth.userId, 'peso_registrado');
     });
     res.status(201).json({ recordedOn: date, weightKg });
@@ -253,7 +254,7 @@ export function progressRouter(ctx) {
     const planned = rows.length;
     const completed = rows.filter(row => row.completed_at).length;
     const gate = await weightAllowed(db, req.auth);
-    const weights = gate.allowed ? (await db.query('SELECT recorded_on, weight_kg FROM weight_records WHERE user_id = $1 ORDER BY recorded_on', [req.auth.userId])).rows.map(row => ({ recordedOn: iso(row.recorded_on), weightKg: Number(row.weight_kg) })) : [];
+    const weights = gate.allowed ? (await db.query('SELECT recorded_on, weight_kg FROM weight_records WHERE user_id = $1 ORDER BY recorded_on', [req.auth.userId])).rows.map(row => ({ recordedOn: iso(row.recorded_on), weightKg: openWeight(req.auth.userId, row.weight_kg) })) : [];
     res.json({ today: current, planned, completed, adherence: planned ? completed / planned : null, weeks: [...weeks.values()], streak, calendar, weightsEnabled: gate.allowed, weights });
   });
 

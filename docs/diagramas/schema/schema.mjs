@@ -278,10 +278,10 @@ export const TABLES = [
       c('days', 'smallint[]', { check: 'fitgoal_days_valid(days)', desc: 'Días disponibles (1 = lunes … 7 = domingo), sin repetir.' }),
       c('duration_minutes', 'integer', { values: [20, 30, 45, 60], desc: 'Minutos disponibles por sesión.' }),
       c('equipment', 'text', { values: ['sin_equipo', 'con_equipo'], desc: 'Equipamiento disponible.' }),
-      c('sex_param', 'text', { nn: false, values: ['masculino', 'femenino'], desc: 'Parámetro de sexo del modelo de Mifflin-St Jeor (opcional, con el consentimiento «datos_nutricionales»; se borra si se revoca).' }),
-      c('weight_kg', 'numeric(5,1)', { nn: false, check: 'weight_kg BETWEEN 30 AND 300', desc: 'Peso en kilogramos (opcional, dato de salud). Solo se guarda con el consentimiento «datos_corporales» y se borra si se revoca.' }),
-      c('height_cm', 'numeric(4,1)', { nn: false, check: 'height_cm BETWEEN 100 AND 250', desc: 'Estatura en centímetros (opcional, dato de salud). Junto al peso permite calcular el IMC.' }),
-      c('activity_level', 'text', { nn: false, values: ['sedentario', 'ligero', 'moderado', 'intenso'], desc: 'Nivel de actividad física habitual, que fija el factor de actividad de las reglas nutricionales (opcional, con el consentimiento «datos_nutricionales»).' }),
+      c('sex_param', 'text', { nn: false, check: 'fitgoal_sealed(sex_param)', desc: 'Parámetro de sexo del modelo de Mifflin-St Jeor: masculino o femenino (opcional, con el consentimiento «datos_nutricionales»; se borra si se revoca). Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base.' }),
+      c('weight_kg', 'text', { nn: false, check: 'fitgoal_sealed(weight_kg)', desc: 'Peso en kilogramos, entre 30 y 300 con un decimal (opcional, dato de salud). Solo se guarda con el consentimiento «datos_corporales» y se borra si se revoca. Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base.' }),
+      c('height_cm', 'text', { nn: false, check: 'fitgoal_sealed(height_cm)', desc: 'Estatura en centímetros, entre 100 y 250 con un decimal (opcional, dato de salud). Junto al peso permite calcular el IMC. Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base.' }),
+      c('activity_level', 'text', { nn: false, check: 'fitgoal_sealed(activity_level)', desc: 'Nivel de actividad física habitual (sedentario, ligero, moderado o intenso), que fija el factor de actividad de las reglas nutricionales (opcional, con el consentimiento «datos_nutricionales»). Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base.' }),
       c('is_fictitious', 'boolean', { def: 'false', desc: 'Copia de la condición de cuenta ficticia al guardar el perfil.' }),
       created(),
     ],
@@ -380,7 +380,7 @@ export const TABLES = [
       uuidPk('Identificador del registro.'),
       c('user_id', 'uuid', { fk: FK('users'), desc: 'Participante.' }),
       c('recorded_on', 'date', { desc: 'Fecha a la que corresponde el peso.' }),
-      c('weight_kg', 'numeric(5,1)', { check: 'weight_kg > 0 AND weight_kg <= 500', desc: 'Peso en kilogramos.' }),
+      c('weight_kg', 'text', { check: 'fitgoal_sealed(weight_kg)', desc: 'Peso en kilogramos, mayor que 0 y hasta 500 con un decimal. Cifrado en la API con AES-256-GCM (texto «v1.…»); la clave está fuera de la base.' }),
       created(),
     ],
     unique: [{ cols: ['user_id', 'recorded_on'], name: 'weight_records_user_day_key', desc: 'Un registro de peso por día.' }],
@@ -391,7 +391,7 @@ export const TABLES = [
     columns: [
       uuidPk('Identificador del aviso.'),
       c('user_id', 'uuid', { fk: FK('users'), desc: 'Destinatario.' }),
-      c('type', 'text', { values: ['sesiones_pendientes', 'solicitud_derechos'], desc: 'Tipo de aviso: recordatorio de sesiones sin registrar o novedad de una solicitud de derechos.' }),
+      c('type', 'text', { values: ['sesiones_pendientes', 'solicitud_derechos', 'rutina_actualizada', 'pauta_actualizada'], desc: 'Tipo de aviso: recordatorio de sesiones sin registrar, novedad de una solicitud de derechos, versión nueva o retiro de la rutina que la persona sigue, o versión nueva o retiro de una pauta en la que cambió alimentos.' }),
       c('ref_id', 'uuid', { nn: false, desc: 'Identificador del registro al que se refiere.' }),
       c('message', 'text', { check: 'length(message) BETWEEN 1 AND 200', desc: 'Texto del aviso, sin datos de salud.' }),
       created(),
@@ -455,6 +455,14 @@ LANGUAGE sql IMMUTABLE AS $$
   SELECT l IS NOT NULL
      AND cardinality(l) BETWEEN 1 AND 7
      AND NOT EXISTS (SELECT 1 FROM unnest(l) AS x WHERE x IS NULL OR length(btrim(x)) NOT BETWEEN 1 AND 40)
+$$;`,
+  },
+  {
+    name: 'fitgoal_sealed',
+    desc: 'Valida que un dato de salud llegue cifrado por la API (AES-256-GCM, formato «v1.» y base64url con vector inicial, texto cifrado y etiqueta).',
+    sql: `CREATE FUNCTION fitgoal_sealed(t text) RETURNS boolean
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT t ~ '^v1[.][A-Za-z0-9_-]{38,}$'
 $$;`,
   },
 ];
@@ -633,13 +641,13 @@ export const DATA_PROTECTION = {
   foods: { cls: 'Catálogo (no personal)', detail: 'author_id y approved_by identifican a la nutricionista.', erase: CATALOG_KEEP },
   meal_plan_templates: { cls: 'Catálogo (no personal)', detail: 'author_id y approved_by identifican a la nutricionista.', erase: CATALOG_KEEP },
   meal_plan_items: { cls: 'Catálogo (no personal)', detail: 'Composición de la pauta.', erase: 'No aplica; sigue a su pauta (ON DELETE CASCADE).' },
-  profile_versions: { cls: 'Sensible (salud)', detail: 'height_cm y weight_kg (consentimiento «datos_corporales») y sex_param y activity_level (consentimiento «datos_nutricionales») son sensibles; el resto del perfil es personal. El IMC se calcula y no se guarda. Al revocar «datos_corporales» se borran los cuatro campos en todas las versiones; al revocar «datos_nutricionales», el sexo y la actividad.', erase: 'Se borran todas las versiones.' },
+  profile_versions: { cls: 'Sensible (salud)', detail: 'height_cm y weight_kg (consentimiento «datos_corporales») y sex_param y activity_level (consentimiento «datos_nutricionales») son sensibles y se guardan cifrados con AES-256-GCM por la API, con la clave fuera de la base; el resto del perfil es personal. El IMC se calcula y no se guarda. Al revocar «datos_corporales» se borran los cuatro campos en todas las versiones; al revocar «datos_nutricionales», el sexo y la actividad.', erase: 'Se borran todas las versiones.' },
   user_plans: { cls: 'Personal', detail: 'Rutina elegida o armada y sus días.', erase: 'Se borran, con sus ejercicios (ON DELETE CASCADE).' },
   user_plan_exercises: { cls: 'Personal', detail: 'Copia de los ejercicios aprobados de la rutina.', erase: 'Se borran con la rutina.' },
   meal_plan_swaps: { cls: 'Personal', detail: 'Alimentos que la persona cambió en su pauta (preferencias o disponibilidad); se incluyen en la exportación.', erase: 'Se borran.' },
   training_sessions: { cls: 'Personal', detail: 'Agenda, sesiones realizadas, cambios de día y nota breve.', erase: 'Se borran.' },
-  weight_records: { cls: 'Sensible (salud)', detail: 'weight_kg; solo con consentimiento «seguimiento_progreso» y tratamiento de datos habilitado. Se borra al revocar «seguimiento_progreso» o «datos_corporales» y con la oposición.', erase: 'Se borran.' },
-  notifications: { cls: 'Personal', detail: 'Mensajes sin información de salud. Se borran a los 6 meses.', erase: 'Se borran.' },
+  weight_records: { cls: 'Sensible (salud)', detail: 'weight_kg, cifrado con AES-256-GCM por la API; solo con consentimiento «seguimiento_progreso» y tratamiento de datos habilitado. Se borra al revocar «seguimiento_progreso» o «datos_corporales» y con la oposición.', erase: 'Se borran.' },
+  notifications: { cls: 'Personal', detail: 'Mensajes sin información de salud (los avisos de rutinas no la nombran, porque su nombre puede incluir la categoría de IMC). Se borran a los 6 meses.', erase: 'Se borran.' },
   audit_log: { cls: 'Trazabilidad', detail: 'actor_id, entidad y versión; detail no guarda tokens ni contenido sensible.', erase: 'Se conserva (solo anexado); el actor queda asociado a la cuenta anonimizada.' },
   usage_events: { cls: 'Seudonimizado', detail: 'pseudonym = HMAC-SHA256 del identificador con un secreto del piloto; no tiene clave foránea hacia users. Solo con consentimiento «evaluacion_piloto»; se borra al revocarlo y a los 24 meses.', erase: 'Se borran los eventos del seudónimo de la cuenta.' },
 };

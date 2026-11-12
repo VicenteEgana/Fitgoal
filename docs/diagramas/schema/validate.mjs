@@ -23,6 +23,8 @@ const expectOk = async (name, sql, params = []) => {
 };
 const ARGON = '$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$aGFzaA';
 const id = async (sql, params) => (await db.query(sql, params)).rows[0].id;
+// Un valor con el formato que deja el cifrado de la API (la base no puede descifrarlo: solo comprueba que no venga en texto plano).
+const SEALED = `v1.${'A'.repeat(40)}`;
 const PROFILE = 'INSERT INTO profile_versions (user_id, version, age, objective, level, days, duration_minutes, equipment';
 const APPROVE_TRAINER = 'status = \'approved\', approved_by = $1, approved_by_role = \'trainer\', approved_at = now()';
 
@@ -39,14 +41,16 @@ await expectFail('menor de edad', `${PROFILE}) VALUES ($1, 2, 17, 'bajar', 'prin
 await expectFail('días repetidos', `${PROFILE}) VALUES ($1, 2, 30, 'bajar', 'principiante', '{1,1}', 30, 'sin_equipo')`, [user]);
 await expectFail('día fuera de 1 a 7', `${PROFILE}) VALUES ($1, 2, 30, 'bajar', 'principiante', '{0,2}', 30, 'sin_equipo')`, [user]);
 await expectFail('duración no permitida', `${PROFILE}) VALUES ($1, 2, 30, 'bajar', 'principiante', '{1}', 25, 'sin_equipo')`, [user]);
-await expectOk('perfil con estatura y peso', `${PROFILE}, height_cm, weight_kg) VALUES ($1, 2, 30, 'mantener', 'principiante', '{1,3}', 30, 'sin_equipo', 172, 70.5)`, [user]);
-await expectFail('peso sin estatura', `${PROFILE}, weight_kg) VALUES ($1, 3, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', 70)`, [user]);
-await expectFail('peso fuera del rango humano', `${PROFILE}, height_cm, weight_kg) VALUES ($1, 3, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', 172, 12)`, [user]);
-await expectFail('estatura fuera del rango humano', `${PROFILE}, height_cm, weight_kg) VALUES ($1, 3, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', 20, 70)`, [user]);
-await expectOk('cálculo energético completo en un perfil real (la API exige el consentimiento «datos_nutricionales»)', `${PROFILE}, height_cm, weight_kg, sex_param, activity_level) VALUES ($1, 3, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', 165, 60, 'femenino', 'ligero')`, [user]);
-await expectFail('sexo sin actividad', `${PROFILE}, height_cm, weight_kg, sex_param) VALUES ($1, 4, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', 165, 60, 'femenino')`, [user]);
-await expectFail('sexo y actividad sin estatura ni peso', `${PROFILE}, sex_param, activity_level) VALUES ($1, 4, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', 'femenino', 'ligero')`, [user]);
+await expectOk('perfil con estatura y peso cifrados', `${PROFILE}, height_cm, weight_kg) VALUES ($1, 2, 30, 'mantener', 'principiante', '{1,3}', 30, 'sin_equipo', '${SEALED}', '${SEALED}')`, [user]);
+await expectFail('peso sin estatura', `${PROFILE}, weight_kg) VALUES ($1, 3, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', '${SEALED}')`, [user]);
+await expectFail('peso sin cifrar (texto plano)', `${PROFILE}, height_cm, weight_kg) VALUES ($1, 3, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', '${SEALED}', '70')`, [user]);
+await expectFail('estatura sin cifrar (texto plano)', `${PROFILE}, height_cm, weight_kg) VALUES ($1, 3, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', '172', '${SEALED}')`, [user]);
+await expectOk('cálculo energético completo en un perfil real (la API exige el consentimiento «datos_nutricionales»)', `${PROFILE}, height_cm, weight_kg, sex_param, activity_level) VALUES ($1, 3, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', '${SEALED}', '${SEALED}', '${SEALED}', '${SEALED}')`, [user]);
+await expectFail('sexo sin actividad', `${PROFILE}, height_cm, weight_kg, sex_param) VALUES ($1, 4, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', '${SEALED}', '${SEALED}', '${SEALED}')`, [user]);
+await expectFail('sexo y actividad sin estatura ni peso', `${PROFILE}, sex_param, activity_level) VALUES ($1, 4, 30, 'bajar', 'principiante', '{1}', 30, 'sin_equipo', '${SEALED}', '${SEALED}')`, [user]);
 
+await expectFail('registro de peso sin cifrar', "INSERT INTO weight_records (user_id, recorded_on, weight_kg) VALUES ($1, '2026-11-01', '70.5')", [user]);
+await expectOk('registro de peso cifrado', "INSERT INTO weight_records (user_id, recorded_on, weight_kg) VALUES ($1, '2026-11-01', $2)", [user, SEALED]);
 const profileId = await id('SELECT id FROM profile_versions WHERE user_id = $1 AND version = 2', [user]);
 const rules = await id("INSERT INTO rule_versions (domain, version, content, author_id) VALUES ('entrenamiento', 1, '{}', $1) RETURNING id", [trainer]);
 await expectFail('reglas de entrenamiento aprobadas por la nutricionista', "UPDATE rule_versions SET status='approved', approved_by=$1, approved_by_role='nutritionist', approved_at=now() WHERE id=$2", [nutri, rules]);

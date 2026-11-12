@@ -1,0 +1,67 @@
+# Integración continua de FitGoal: cada cambio que llega a GitHub corre las pruebas de la API, del modelo de datos y de la app.
+# Si algo falla, el cambio no se une a master (regla de protección de la rama) ni se despliega.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API y modelo de datos
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            docs/diagramas/package-lock.json
+      - name: Dependencias de la API
+        run: npm ci
+        working-directory: backend
+      - name: Pruebas de la API (PostgreSQL en proceso)
+        run: npm test
+        working-directory: backend
+      - name: Dependencias del generador del modelo
+        run: npm ci
+        working-directory: docs/diagramas
+      - name: La migración coincide con el esquema documentado
+        working-directory: docs/diagramas
+        run: |
+          node -e "import('./schema/sql.mjs').then(m => process.stdout.write(m.fullMigration()))" > /tmp/esperada.sql
+          diff -u --strip-trailing-cr /tmp/esperada.sql ../../backend/migrations/001_modelo_mvp.sql
+      - name: Reglas de integridad del modelo
+        run: node schema/validate.mjs
+        working-directory: docs/diagramas
+
+  app:
+    name: App Flutter
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.6
+          cache: true
+      - run: flutter pub get
+      - name: Análisis estático
+        run: flutter analyze
+      - name: Pruebas de la app
+        run: flutter test

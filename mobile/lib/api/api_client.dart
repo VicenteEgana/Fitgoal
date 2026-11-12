@@ -97,6 +97,16 @@ class ApiClient {
     }
   }
 
+  /// Recién creada la cuenta, la app pide el perfil guiado; el intento de registro viaja con el primer perfil para medir K1.
+  bool justRegistered = false;
+  String? registrationIntent;
+
+  /// Cierra el recorrido de registro (perfil guardado o dejado para más tarde).
+  void finishRegistration() {
+    justRegistered = false;
+    registrationIntent = null;
+  }
+
   Future<void> register({
     required String email,
     required String password,
@@ -113,6 +123,8 @@ class ApiClient {
       'intentId': ?intentId,
     });
     await _open(session as Map<String, dynamic>);
+    justRegistered = true;
+    registrationIntent = intentId;
   }
 
   Future<void> login(String email, String password) async {
@@ -121,6 +133,7 @@ class ApiClient {
   }
 
   Future<void> logout() async {
+    finishRegistration();
     try {
       await _send('POST', '/api/auth/logout');
     } on ApiException {

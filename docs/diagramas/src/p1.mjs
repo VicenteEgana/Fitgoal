@@ -17,7 +17,7 @@ export function p1() {
   const start = d.start(0, colX(0), 'Quiere un plan de entrenamiento');
   const t1 = d.task(0, colX(1), 'Registrarse con correo y contraseña');
   const sp1 = d.sub(1, colX(1), 'SP1.1 Registro y consentimiento', { dy: main });
-  const t3 = d.task(0, colX(2), 'Completar su perfil (estatura y peso opcionales)');
+  const t3 = d.task(0, colX(2), 'Responder el perfil guiado al crear la cuenta (estatura y peso opcionales)', { w: 150, h: 76 });
   const sp2 = d.sub(1, colX(2), 'SP1.2 Validación del perfil', { dy: main });
   const x1 = d.gateway(1, colX(3), 'xor', '¿Perfil válido?', { dy: main, labelDx: 38, labelW: 90 });
   const corr = d.task(0, colX(3), 'Corregir los datos indicados');

@@ -5,15 +5,15 @@ import { fail } from '../lib/errors.js';
 import { currentProfile, hasConsent } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
 import { FORMULA, restingEnergy } from '../lib/energy.js';
-import { personalEnergy } from './nutrition.js';
+import { nutritionEnabled, personalEnergy } from './nutrition.js';
 
 export { FORMULA, restingEnergy };
 
 export function estimatesRouter(ctx) {
-  const { db } = ctx;
+  const { db, config } = ctx;
   const router = Router();
 
-  router.get('/estimates/energy', requireRole('user'), async (req, res) => {
+  router.get('/estimates/energy', requireRole('user'), nutritionEnabled(config), async (req, res) => {
     const consented = (await hasConsent(db, req.auth.userId, 'datos_corporales')) && (await hasConsent(db, req.auth.userId, 'datos_nutricionales'));
     if (!consented) fail(403, 'NUTRITION_DATA_CONSENT_REQUIRED', 'Para calcular tus calorías necesitamos tus consentimientos de datos corporales y nutricionales.');
     const profile = await currentProfile(db, req.auth.userId);

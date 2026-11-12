@@ -39,12 +39,18 @@ async function applyRetention(tx, config, at) {
 
 /**
  * Tareas periódicas: recordatorios de sesiones pendientes para quienes los activaron y plazos de conservación.
- * Es idempotente: no repite un recordatorio ya enviado en los últimos 7 días.
+ * Es idempotente: no repite un recordatorio ya enviado en los últimos 7 días. Si la API corre en varias instancias, un
+ * bloqueo de PostgreSQL deja que solo una ejecute la tarea a la vez; las demás la omiten («skipped»).
  */
 export async function runMaintenance(ctx) {
   const { db, config, now } = ctx;
   const stats = { sessionReminders: 0 };
   await db.transaction(async tx => {
+    const locked = (await tx.query("SELECT pg_try_advisory_xact_lock(hashtext('fitgoal.mantenimiento')) AS ok")).rows[0].ok;
+    if (!locked) {
+      stats.skipped = true;
+      return;
+    }
     const today = localDate(now(), config.timezone);
     const pending = (await tx.query(
       `SELECT s.user_id, count(*)::int AS missing FROM training_sessions s
@@ -158,7 +164,7 @@ export function adminRouter(ctx) {
       generatedAt: now(),
       note: 'Con pocas personas, estas cifras describen solo a la cohorte y no demuestran efectos en salud. Sin participantes inscritos, los indicadores quedan «sin mediciones».',
       kpis: {
-        K1: { ...ratio(fast, registration.length), description: 'Registros completados en menos de 5 minutos (tiempo medido; «sin ayuda» se observa en la prueba de usabilidad).' },
+        K1: { ...ratio(fast, registration.length), description: 'Registros con perfil completado en menos de 5 minutos, desde que se abre el registro hasta guardar el primer perfil (tiempo medido; «sin ayuda» se observa en la prueba de usabilidad).' },
         K2: { ...ratio(retained.length, enrolled.length), description: 'Inscritos con actividad en la semana 4.' },
         K3: { ...ratio(adherence.completed, adherence.planned), description: 'Sesiones declaradas realizadas sobre programadas vencidas; una sesión sin registro cuenta como no realizada.' },
         K5: { ...ratio(approved.ok, visible.total), description: 'Rutinas vigentes compuestas solo por contenido aprobado por el preparador físico (plantilla y ejercicios). El objetivo es 100 %.' },

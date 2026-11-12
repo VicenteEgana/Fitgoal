@@ -5,6 +5,7 @@ import { fail } from '../lib/errors.js';
 import { audit, consentState, consentTime, eraseForPurpose, notify, notifyAdmins, profileView } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
 import { pseudonymOf } from '../lib/security.js';
+import { openProfile, openWeight } from '../lib/health-data.js';
 import { addBusinessDays, localDate } from '../lib/time.js';
 import { uuidParam } from '../lib/validate.js';
 
@@ -25,7 +26,7 @@ export async function exportUserData(tx, userId) {
   return {
     generatedAt: new Date().toISOString(),
     account: { id: user.id, email: user.email, role: user.role, createdAt: user.created_at },
-    profiles: (await q('SELECT * FROM profile_versions WHERE user_id = $1 ORDER BY version')).map(profileView),
+    profiles: (await q('SELECT * FROM profile_versions WHERE user_id = $1 ORDER BY version')).map(row => profileView(openProfile(row))),
     consents: Object.values(await consentState(tx, userId)).map(row => ({ purpose: row.purpose, granted: row.granted, policyVersion: row.policy_version, recordedAt: row.recorded_at })),
     plans: await Promise.all((await q('SELECT id, source, name, version, weeks, session_minutes, days, session_labels, status, started_at FROM user_plans WHERE user_id = $1 ORDER BY started_at')).map(async row => ({
       source: row.source, name: row.name, version: row.version, weeks: row.weeks, sessionMinutes: row.session_minutes, days: row.days.map(Number), sessionLabels: row.session_labels,
@@ -41,7 +42,7 @@ export async function exportUserData(tx, userId) {
          JOIN meal_plan_items i ON (i.template_id, i.day_no, i.meal, i.position) = (s.template_id, s.day_no, s.meal, s.position) JOIN foods o ON o.id = i.food_id
         WHERE s.user_id = $1 ORDER BY t.name, s.day_no, s.meal, s.position`))
       .map(row => ({ mealPlan: row.plan, dayNo: row.day_no, meal: row.meal, replaced: row.replaced, food: row.food, createdAt: row.created_at })),
-    weights: (await q('SELECT recorded_on, weight_kg FROM weight_records WHERE user_id = $1 ORDER BY recorded_on')).map(row => ({ recordedOn: row.recorded_on, weightKg: Number(row.weight_kg) })),
+    weights: (await q('SELECT recorded_on, weight_kg FROM weight_records WHERE user_id = $1 ORDER BY recorded_on')).map(row => ({ recordedOn: row.recorded_on, weightKg: openWeight(userId, row.weight_kg) })),
     notifications: (await q('SELECT type, message, created_at FROM notifications WHERE user_id = $1 ORDER BY created_at')).map(row => ({ type: row.type, message: row.message, createdAt: row.created_at })),
   };
 }

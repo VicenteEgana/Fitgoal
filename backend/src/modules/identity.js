@@ -63,10 +63,8 @@ export function identityRouters(ctx) {
       const granted = ['registro_cuenta', 'perfil_entrenamiento', ...OPTIONAL_CONSENTS.filter(purpose => consents[purpose] === true)];
       for (const purpose of granted) await tx.query('INSERT INTO consents (user_id, purpose, policy_version, granted) VALUES ($1, $2, $3, true)', [user.id, purpose, config.policyVersion]);
       await audit(tx, now(), { action: 'user.registered', entityType: 'user', entityId: user.id, detail: { consents: granted } });
-      if (consents.evaluacion_piloto === true) {
-        await tx.query('UPDATE users SET enrolled_at = $2 WHERE id = $1', [user.id, now()]);
-        await usageEvent(tx, config, now(), `intent:${body.intentId ?? user.id}`, 'registro_completado');
-      }
+      // El término del registro (K1) se marca al guardar el primer perfil, que la app pide justo después de crear la cuenta.
+      if (consents.evaluacion_piloto === true) await tx.query('UPDATE users SET enrolled_at = $2 WHERE id = $1', [user.id, now()]);
       return openSession(tx, user);
     });
     res.status(201).json(session);

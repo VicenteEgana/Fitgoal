@@ -44,6 +44,30 @@ class PlanTab extends StatelessWidget {
     if (context.mounted) showMessage(context, message);
   }
 
+  /// Pasa a la versión nueva de la rutina recomendada, con los mismos días. La rutina no cambia sola: la persona lo decide.
+  Future<void> _updateTemplate(BuildContext context, Map<String, dynamic> plan, Future<void> Function() reload) async {
+    final update = plan['templateUpdate'] as Map<String, dynamic>;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Actualizar a la versión ${update['version']}'),
+        content: const Text('La versión nueva empieza mañana, con tus mismos días. Las sesiones que ya registraste quedan en tu historial y tu racha no se corta.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Seguir con la mía')),
+          FilledButton(key: const Key('confirm-template-update'), onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Actualizar')),
+        ],
+      ),
+    );
+    if (accepted != true) return;
+    try {
+      await api.post('/api/plans/start', {'source': 'recomendada', 'templateId': update['templateId'], 'days': plan['days']});
+      await reload();
+      if (context.mounted) showMessage(context, 'Listo: desde mañana sigues la versión ${update['version']}.');
+    } on ApiException catch (error) {
+      if (context.mounted) showMessage(context, error.message);
+    }
+  }
+
   /// Cambia la sesión de día y devuelve la nueva fecha (o null si la persona no la movió).
   Future<String?> _move(BuildContext context, String sessionId, Future<void> Function() reload) async {
     final moved = await moveSession(context, api, sessionId);
@@ -148,7 +172,7 @@ class PlanTab extends StatelessWidget {
                 onRegister: (session) => _register(context, session, session['name'] as String, weightsEnabled, reload),
                 onMove: (session) => _move(context, session['id'] as String, reload),
               ),
-            if (plan != null) _PlanCard(plan: plan, profileChanged: profileChanged, onGoToRoutines: onGoToRoutines),
+            if (plan != null) _PlanCard(plan: plan, profileChanged: profileChanged, onGoToRoutines: onGoToRoutines, onUpdate: () => _updateTemplate(context, plan, reload)),
             _ProgressCard(progress: progress),
           ],
         );
@@ -570,10 +594,11 @@ class _DayDetail extends StatelessWidget {
 
 /// La rutina vigente: origen, duración, semana en curso y la semana tipo con sus días de descanso.
 class _PlanCard extends StatelessWidget {
-  const _PlanCard({required this.plan, required this.profileChanged, required this.onGoToRoutines});
+  const _PlanCard({required this.plan, required this.profileChanged, required this.onGoToRoutines, required this.onUpdate});
   final Map<String, dynamic> plan;
   final bool profileChanged;
   final VoidCallback onGoToRoutines;
+  final VoidCallback onUpdate;
 
   @override
   Widget build(BuildContext context) {
@@ -582,6 +607,7 @@ class _PlanCard extends StatelessWidget {
     final currentWeek = plan['currentWeek'] as int?;
     final weeks = plan['weeks'] as int;
     final template = plan['template'] as Map<String, dynamic>?;
+    final update = plan['templateUpdate'] as Map<String, dynamic>?;
     return SectionCard(
       title: 'Tu rutina',
       trailing: StatusChip(plan['source'] == 'recomendada' ? 'Recomendada' : 'Propia'),
@@ -615,6 +641,30 @@ class _PlanCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           LinearProgressIndicator(value: (currentWeek.clamp(0, weeks)) / weeks, minHeight: 6, borderRadius: BorderRadius.circular(3)),
+        ],
+        if (update != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            key: const Key('template-update'),
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Theme.of(context).colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(8)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                update['kind'] == 'retirada'
+                    ? 'El preparador dejó de ofrecer esta rutina. Puedes terminarla o elegir otra.'
+                    : update['fitsDays'] == true
+                        ? 'El preparador publicó la versión ${update['version']} de esta rutina. La tuya sigue igual hasta que decidas actualizarla.'
+                        : 'El preparador publicó la versión ${update['version']}, que se hace entre ${update['minDays']} y ${update['maxDays']} días por semana. Elígela en Rutinas para ajustar tus días.',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSecondaryContainer),
+              ),
+              const SizedBox(height: 4),
+              if (update['kind'] == 'nueva_version' && update['fitsDays'] == true)
+                FilledButton.tonal(key: const Key('update-template'), onPressed: onUpdate, child: Text('Actualizar a la versión ${update['version']}'))
+              else
+                TextButton(key: const Key('update-see-routines'), onPressed: onGoToRoutines, child: const Text('Ver rutinas')),
+            ]),
+          ),
         ],
         if (profileChanged) ...[
           const SizedBox(height: 8),

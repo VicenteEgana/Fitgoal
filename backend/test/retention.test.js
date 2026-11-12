@@ -71,7 +71,7 @@ describe('Consentimiento de evaluación del piloto', () => {
 
   test('sin consentimiento el registro no deja el evento que mide K1', async () => {
     const before_ = await count(ctx, "SELECT count(*)::int AS n FROM usage_events WHERE event_type = 'registro_completado'");
-    await ctx.register(without);
+    await participantWithProfile(ctx, { extra: without });
     assert.equal(await count(ctx, "SELECT count(*)::int AS n FROM usage_events WHERE event_type = 'registro_completado'"), before_);
   });
 

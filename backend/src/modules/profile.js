@@ -1,8 +1,9 @@
 // Perfil versionado y consentimientos. Cada cambio del perfil crea una versión nueva.
 import { Router } from 'express';
 import { fail } from '../lib/errors.js';
-import { audit, consentState, consentTime, currentProfile, eraseForPurpose, hasConsent, profileView } from '../lib/records.js';
+import { audit, consentState, consentTime, currentProfile, eraseForPurpose, hasConsent, profileView, usageEvent } from '../lib/records.js';
 import { requireRole } from '../lib/auth.js';
+import { openProfile, sealProfile } from '../lib/health-data.js';
 
 export const OBJECTIVES = ['bajar', 'mantener', 'subir'];
 export const LEVELS = ['principiante', 'con_experiencia'];
@@ -47,6 +48,26 @@ export function validateProfile(body) {
   };
 }
 
+/**
+ * Qué cambió respecto de la versión anterior, por grupos y sin valores: «datos_corporales» (estatura o peso) y
+ * «datos_nutricionales» (sexo o actividad) quedan trazados sin exponer el dato de salud en la bitácora.
+ */
+export function changedFields(previous, values) {
+  if (!previous) return ['perfil_inicial'];
+  const same = (a, b) => (a === null || a === undefined ? null : String(a)) === (b === null || b === undefined ? null : String(b));
+  const groups = {
+    edad: [[previous.age, values.age]],
+    objetivo: [[previous.objective, values.objective]],
+    nivel: [[previous.level, values.level]],
+    dias: [[previous.days.map(Number).join(','), values.days.join(',')]],
+    duracion: [[previous.duration_minutes, values.durationMinutes]],
+    equipo: [[previous.equipment, values.equipment]],
+    datos_corporales: [[previous.weight_kg, values.weightKg === null ? null : Math.round(values.weightKg * 10) / 10], [previous.height_cm, values.heightCm === null ? null : Math.round(values.heightCm * 10) / 10]],
+    datos_nutricionales: [[previous.sex_param, values.sexParam], [previous.activity_level, values.activityLevel]],
+  };
+  return Object.entries(groups).filter(([, pairs]) => pairs.some(([a, b]) => !same(a, b))).map(([name]) => name);
+}
+
 export function profileRouter(ctx) {
   const { db, config, now } = ctx;
   const router = Router();
@@ -60,8 +81,14 @@ export function profileRouter(ctx) {
     res.json({ versions: rows.map(row => ({ id: row.id, version: row.version, createdAt: row.created_at })) });
   });
 
+  /**
+   * Guarda una versión nueva del perfil. La primera versión cierra el registro (K1): la app la pide justo después de crear
+   * la cuenta y envía el mismo identificador de intento que marcó el inicio («?intent=»), para medir el tiempo sin la cuenta.
+   */
   router.put('/profiles/me', requireRole('user'), async (req, res) => {
     const values = validateProfile(req.body);
+    const intent = req.query.intent;
+    if (intent !== undefined && (typeof intent !== 'string' || !/^[0-9a-f-]{36}$/i.test(intent))) fail(400, 'INVALID_INTENT', 'Identificador de intento inválido.');
     const result = await db.transaction(async tx => {
       if (!(await hasConsent(tx, req.auth.userId, 'perfil_entrenamiento'))) fail(403, 'CONSENT_REQUIRED', 'Necesitamos tu consentimiento para tratar tu perfil de entrenamiento.');
       // La estatura y el peso son datos de salud: solo se guardan con su consentimiento específico.
@@ -70,14 +97,18 @@ export function profileRouter(ctx) {
       if (values.sexParam !== null && !(await hasConsent(tx, req.auth.userId, 'datos_nutricionales'))) fail(403, 'NUTRITION_DATA_CONSENT_REQUIRED', 'Para usar tu sexo y nivel de actividad en tu pauta de alimentación necesitamos tu consentimiento específico. Puedes dejarlos en blanco.');
       const previous = await currentProfile(tx, req.auth.userId);
       const version = (previous?.version ?? 0) + 1;
+      // Los datos de salud se guardan cifrados (AES-256-GCM); la clave no está en la base.
+      const sealed = sealProfile(req.auth.userId, { weight_kg: values.weightKg, height_cm: values.heightCm, sex_param: values.sexParam, activity_level: values.activityLevel });
       const inserted = await tx.query(
         `INSERT INTO profile_versions (user_id, version, age, objective, level, days, duration_minutes, equipment, sex_param, weight_kg, height_cm, activity_level, is_fictitious, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-        [req.auth.userId, version, values.age, values.objective, values.level, values.days, values.durationMinutes, values.equipment, values.sexParam, values.weightKg, values.heightCm, values.activityLevel, req.auth.isFictitious, now()],
+        [req.auth.userId, version, values.age, values.objective, values.level, values.days, values.durationMinutes, values.equipment, sealed.sex_param, sealed.weight_kg, sealed.height_cm, sealed.activity_level, req.auth.isFictitious, now()],
       );
       // Cambiar el perfil no modifica la rutina vigente: la persona decide cuándo iniciar otra.
-      await audit(tx, now(), { actor: req.auth, action: 'profile.updated', entityType: 'profile', entityId: inserted.rows[0].id, version });
-      return { profile: profileView(inserted.rows[0]) };
+      if (!previous && (await hasConsent(tx, req.auth.userId, 'evaluacion_piloto'))) await usageEvent(tx, config, now(), `intent:${intent ?? req.auth.userId}`, 'registro_completado');
+      // La bitácora registra qué cambió (nombres de los campos), nunca los valores.
+      await audit(tx, now(), { actor: req.auth, action: 'profile.updated', entityType: 'profile', entityId: inserted.rows[0].id, version, detail: { changed: changedFields(previous, values) } });
+      return { profile: profileView(openProfile(inserted.rows[0])) };
     });
     res.json(result);
   });

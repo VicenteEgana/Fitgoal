@@ -1,6 +1,6 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createContext, participantWithPlan, PASSWORD, POLICY } from './helpers.js';
+import { createContext, participantWithPlan, PASSWORD, POLICY, PROFILE } from './helpers.js';
 
 describe('Administración, auditoría e indicadores (RF010, K1, K3, K5)', () => {
   let ctx;
@@ -86,13 +86,23 @@ describe('Administración, auditoría e indicadores (RF010, K1, K3, K5)', () => 
     ctx.advanceDays(-8);
   });
 
-  test('K1: el tiempo de registro se mide con eventos seudonimizados del intento', async () => {
+  test('K1: el registro termina al guardar el primer perfil y se mide con eventos seudonimizados del intento', async () => {
     const intentId = '3f2b8c1e-5d4a-4b6e-9a7c-1d2e3f4a5b6c';
+    const kpi = async () => (await (await ctx.demo('admin')).get('/api/admin/kpis')).body.kpis.K1;
+    const completed = async () => (await ctx.db.query("SELECT count(*)::int AS n FROM usage_events WHERE event_type = 'registro_completado'")).rows[0].n;
     assert.equal((await ctx.http.post('/api/public/registration-started').send({ intentId })).status, 204);
-    ctx.tick(2 * 60 * 1000);
-    await ctx.register({ intentId });
-    const { K1 } = (await (await ctx.demo('admin')).get('/api/admin/kpis')).body.kpis;
-    assert.ok(K1.denominator >= 1 && K1.numerator >= 1, 'un registro de 2 minutos cumple el umbral de 5');
+    ctx.tick(60 * 1000);
+    const before = await completed();
+    const person = await ctx.register({ intentId });
+    assert.equal(await completed(), before, 'crear la cuenta todavía no completa el registro: falta el perfil');
+    ctx.tick(60 * 1000);
+    assert.equal((await person.api.put(`/api/profiles/me?intent=${intentId}`).send(PROFILE)).status, 200);
+    assert.equal(await completed(), before + 1);
+    const K1 = await kpi();
+    assert.ok(K1.denominator >= 1 && K1.numerator >= 1, 'cuenta y perfil en 2 minutos cumplen el umbral de 5');
+    await person.api.put(`/api/profiles/me?intent=${intentId}`).send({ ...PROFILE, objective: 'mantener' });
+    assert.equal(await completed(), before + 1, 'los cambios posteriores del perfil no vuelven a marcarlo');
+    assert.equal((await person.api.put('/api/profiles/me?intent=no-valido').send(PROFILE)).body.error.code, 'INVALID_INTENT');
     assert.equal((await ctx.http.post('/api/public/registration-started').send({ intentId: 'no-valido' })).status, 400);
   });
 
