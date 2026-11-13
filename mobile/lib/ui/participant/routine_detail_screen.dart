@@ -80,87 +80,111 @@ class _RoutineDetailScreenState extends State<RoutineDetailScreen> {
     if (message != null && mounted) Navigator.pop(context, message);
   }
 
+  void _showExercise(Map<String, dynamic> exercise) => showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(exercise['name'] as String),
+      content: Text('${exercise['description']}\n\nIndicación: ${exercise['prescription']}'),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cerrar'))],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final routine = widget.routine;
+    final tokens = FitTokens.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(routine['name'] as String, overflow: TextOverflow.ellipsis)),
+      appBar: AppBar(title: Text(routineTitle(routine['name'] as String), overflow: TextOverflow.ellipsis)),
       body: SafeArea(
         child: Loader<Map<String, dynamic>>(
           load: () async => (await widget.api.get('/api/routines/${routine['id']}') as Map)['routine'] as Map<String, dynamic>,
           builder: (context, detail, reload) {
             final warnings = _validDays ? recoveryWarnings({for (final day in _sortedDays) day: _groups(_sessionFor(detail, day))}) : const <String>[];
-            return ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Text(detail['summary'] as String),
-                const SizedBox(height: 6),
-                Text('${splitLabels[detail['split']]}: ${splitDescriptions[detail['split']]!.toLowerCase()}', key: const Key('routine-split'), style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                Wrap(spacing: 6, runSpacing: 6, children: [
-                  for (final text in [
-                    '${detail['weeks']} semanas',
-                    '${detail['sessionMinutes']} min por sesión',
-                    levelLabels[detail['level']] ?? '',
-                    equipmentLabels[detail['equipment']] ?? '',
-                    bmiCategoryLabels[detail['bmiCategory']] ?? '',
-                  ])
-                    if (text.isNotEmpty) Chip(label: Text(text), visualDensity: VisualDensity.compact, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            final header = FitCard(
+              hero: true,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Icon(Icons.verified_rounded, size: 18, color: tokens.accent),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text('Rutina aprobada por un profesional', style: TextStyle(color: tokens.accent, fontWeight: FontWeight.w700, fontSize: 13))),
                 ]),
-                const SizedBox(height: 6),
-                const Row(children: [Icon(Icons.verified, size: 16), SizedBox(width: 6), Expanded(child: Text('Rutina aprobada por un profesional'))]),
+                const SizedBox(height: 10),
+                Text(routineTitle(detail['name'] as String? ?? routine['name'] as String), style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text('${splitLabels[detail['split']]}: ${splitDescriptions[detail['split']]!.toLowerCase()}', key: const Key('routine-split'), style: TextStyle(fontWeight: FontWeight.w600, color: tokens.muted)),
                 const SizedBox(height: 12),
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  if (objectiveLabels[detail['objective']] case final objective?) Pill(objective, icon: Icons.track_changes, color: tokens.accent),
+                  if (levelLabels[detail['level']] case final level?) Pill(level, icon: Icons.bolt_rounded, color: tokens.carbs),
+                  if (equipmentLabels[detail['equipment']] case final equipment?) Pill(equipment, icon: detail['equipment'] == 'con_equipo' ? Icons.fitness_center : Icons.accessibility_new, color: tokens.protein),
+                  Pill('${detail['sessionMinutes']} min por sesión', icon: Icons.timer_outlined),
+                  Pill('${detail['weeks']} semanas', icon: Icons.date_range_outlined),
+                  if (bmiCategoryLabels[detail['bmiCategory']] case final bmi?) Pill(bmi, icon: Icons.monitor_weight_outlined),
+                ]),
+                const SizedBox(height: 12),
+                Text(detail['summary'] as String, style: const TextStyle(height: 1.45)),
+              ]),
+            );
+            final week = SectionCard(
+              title: 'Tu semana',
+              icon: Icons.calendar_month_outlined,
+              children: [
+                Text(_min == _max ? 'Esta rutina se hace $_min días por semana; los demás son de descanso.' : 'Elige entre $_min y $_max días por semana; los demás son de descanso.', style: TextStyle(color: tokens.muted, fontSize: 13.5)),
+                const SizedBox(height: 12),
+                for (var day = 1; day <= 7; day++)
+                  WeekDayRow(
+                    key: Key('day-$day'),
+                    day: day,
+                    selected: _days.contains(day),
+                    label: _days.contains(day) && _validDays ? _sessionFor(detail, day)['label'] as String : null,
+                    onTap: () => setState(() => _days.contains(day) ? _days.remove(day) : _days.add(day)),
+                  ),
+                if (!_validDays) Callout(icon: Icons.error_outline, color: Theme.of(context).colorScheme.error, child: Text('Elige entre $_min y $_max días.', key: const Key('days-error'))),
+                for (final (index, warning) in warnings.indexed) HintLine(warning, key: Key('recovery-warning-$index'), icon: Icons.bedtime_outlined),
+              ],
+            );
+            final actions = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              FilledButton(key: const Key('start-routine'), onPressed: _busy || !_validDays ? null : _start, child: Text(_busy ? 'Empezando…' : 'Empezar esta rutina')),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('customize-routine'),
+                onPressed: _busy || !_validDays ? null : () => _customize(detail),
+                icon: const Icon(Icons.tune),
+                label: const Text('Personalizarla como rutina propia'),
+              ),
+              const SizedBox(height: 12),
+              Text('Las rutinas son orientaciones generales y no reemplazan la evaluación de un profesional de la salud. Si sientes dolor o molestias, detente.', style: Theme.of(context).textTheme.bodySmall),
+            ]);
+            final sessions = [
+              for (final session in (detail['sessions'] as List).cast<Map<String, dynamic>>())
                 SectionCard(
-                  title: 'Tu semana',
+                  title: 'Sesión ${session['sessionNo']} · ${session['label']}',
+                  icon: Icons.fitness_center,
                   children: [
-                    Text(_min == _max ? 'Esta rutina se hace $_min días por semana; los demás son de descanso.' : 'Elige entre $_min y $_max días por semana; los demás son de descanso.'),
-                    const SizedBox(height: 8),
-                    for (var day = 1; day <= 7; day++)
-                      WeekDayRow(
-                        key: Key('day-$day'),
-                        day: day,
-                        selected: _days.contains(day),
-                        label: _days.contains(day) && _validDays ? _sessionFor(detail, day)['label'] as String : null,
-                        onTap: () => setState(() => _days.contains(day) ? _days.remove(day) : _days.add(day)),
+                    GroupChips(_groups(session)),
+                    const SizedBox(height: 12),
+                    for (final (index, exercise) in (session['exercises'] as List).cast<Map<String, dynamic>>().indexed)
+                      ExerciseItem(
+                        index: index,
+                        name: exercise['name'] as String,
+                        prescription: '${exercise['prescription']} · ${muscleGroupLabels[exercise['muscleGroup']]}${exercise['highImpact'] == true ? ' · alto impacto' : ''}',
+                        onTap: () => _showExercise(exercise),
+                        trailing: Icon(Icons.chevron_right, color: tokens.muted),
                       ),
-                    if (!_validDays) Padding(padding: const EdgeInsets.only(top: 8), child: Text('Elige entre $_min y $_max días.', key: const Key('days-error'), style: TextStyle(color: Theme.of(context).colorScheme.error))),
-                    for (final (index, warning) in warnings.indexed) HintLine(warning, key: Key('recovery-warning-$index'), icon: Icons.bedtime_outlined),
                   ],
                 ),
-                for (final session in (detail['sessions'] as List).cast<Map<String, dynamic>>())
-                  SectionCard(
-                    title: 'Sesión ${session['sessionNo']} · ${session['label']}',
-                    children: [
-                      GroupChips(_groups(session)),
-                      const SizedBox(height: 4),
-                      for (final (index, exercise) in (session['exercises'] as List).cast<Map<String, dynamic>>().indexed)
-                        ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: CircleAvatar(radius: 14, child: Text('${index + 1}', style: const TextStyle(fontSize: 12))),
-                          title: Text(exercise['name'] as String),
-                          subtitle: Text('${exercise['prescription']} · ${muscleGroupLabels[exercise['muscleGroup']]}${exercise['highImpact'] == true ? ' · alto impacto' : ''}'),
-                          onTap: () => showDialog<void>(
-                            context: context,
-                            builder: (dialogContext) => AlertDialog(
-                              title: Text(exercise['name'] as String),
-                              content: Text('${exercise['description']}\n\nIndicación: ${exercise['prescription']}'),
-                              actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cerrar'))],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                FilledButton(key: const Key('start-routine'), onPressed: _busy || !_validDays ? null : _start, child: Text(_busy ? 'Empezando…' : 'Empezar esta rutina')),
+            ];
+            return PageList(
+              children: [
                 const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  key: const Key('customize-routine'),
-                  onPressed: _busy || !_validDays ? null : () => _customize(detail),
-                  icon: const Icon(Icons.tune),
-                  label: const Text('Personalizarla como rutina propia'),
+                header,
+                BentoColumns(
+                  primaryFlex: 5,
+                  secondaryFlex: 7,
+                  primary: [week, actions],
+                  secondary: sessions,
+                  narrow: [week, ...sessions, actions],
                 ),
-                const SizedBox(height: 8),
-                const Text('Las rutinas son orientaciones generales y no reemplazan la evaluación de un profesional de la salud. Si sientes dolor o molestias, detente.', style: TextStyle(fontSize: 12)),
               ],
             );
           },

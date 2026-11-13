@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../settings.dart';
+import 'design.dart';
+
+export 'design.dart';
 
 const objectiveLabels = {
   'bajar': 'Bajar de peso',
@@ -194,17 +197,21 @@ List<String> recoveryWarnings(Map<int, Set<String>> groupsByDay) {
   return warnings;
 }
 
-/// Cómo se ve cada estado de un día del horario.
+/// Cómo se ve cada estado de un día del horario: realizada en esmeralda, descanso en índigo, comodín en celeste y sin
+/// registrar en rojo suave.
 ({IconData icon, Color background, Color foreground, String label}) dayStatusStyle(BuildContext context, String status) {
   final scheme = Theme.of(context).colorScheme;
+  final tokens = FitTokens.of(context);
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  Color tint(Color color) => color.withValues(alpha: dark ? 0.18 : 0.14);
   return switch (status) {
     'hecho' => (icon: Icons.check, background: scheme.primary, foreground: scheme.onPrimary, label: 'Sesión realizada'),
-    'descanso' => (icon: Icons.bedtime_outlined, background: scheme.surfaceContainerHighest, foreground: scheme.onSurfaceVariant, label: 'Descanso'),
-    'pendiente' => (icon: Icons.fitness_center, background: scheme.primaryContainer, foreground: scheme.onPrimaryContainer, label: 'Te toca hoy'),
-    'programada' => (icon: Icons.fitness_center, background: scheme.secondaryContainer, foreground: scheme.onSecondaryContainer, label: 'Sesión programada'),
-    'comodin' => (icon: Icons.ac_unit, background: scheme.tertiaryContainer, foreground: scheme.onTertiaryContainer, label: 'Sin registrar: la cubrió el comodín'),
-    'perdido' => (icon: Icons.close, background: scheme.errorContainer, foreground: scheme.onErrorContainer, label: 'Sin registrar'),
-    'movida' => (icon: Icons.event_repeat, background: scheme.surfaceContainerHighest, foreground: scheme.tertiary, label: 'Sesión movida a otro día'),
+    'descanso' => (icon: Icons.bedtime_outlined, background: tint(tokens.rest), foreground: tokens.rest, label: 'Descanso'),
+    'pendiente' => (icon: Icons.fitness_center, background: tint(scheme.primary), foreground: tokens.accent, label: 'Te toca hoy'),
+    'programada' => (icon: Icons.fitness_center, background: tokens.cardHigh, foreground: scheme.onSurface.withValues(alpha: 0.75), label: 'Sesión programada'),
+    'comodin' => (icon: Icons.ac_unit, background: tint(tokens.info), foreground: tokens.info, label: 'Sin registrar: la cubrió el comodín'),
+    'perdido' => (icon: Icons.close, background: tint(tokens.danger), foreground: tokens.danger, label: 'Sin registrar'),
+    'movida' => (icon: Icons.event_repeat, background: tokens.cardHigh, foreground: tokens.muted, label: 'Sesión movida a otro día'),
     _ => (icon: Icons.remove, background: Colors.transparent, foreground: scheme.outline, label: 'Sin rutina'),
   };
 }
@@ -218,21 +225,22 @@ class GroupChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = FitTokens.of(context);
     return Wrap(spacing: 6, runSpacing: 6, children: [
       for (final group in groups)
         ActionChip(
           key: Key('group-chip-$group'),
-          avatar: Icon(muscleGroupIcons[group], size: 16),
+          avatar: Icon(muscleGroupIcons[group], size: 16, color: tokens.accent),
           label: Row(mainAxisSize: MainAxisSize.min, children: [
             Text('${muscleGroupLabels[group] ?? group}${counts?[group] == null ? '' : ': ${counts![group]}'}'),
             const SizedBox(width: 4),
-            Icon(Icons.info_outline, size: 14, color: Theme.of(context).colorScheme.primary),
+            Icon(Icons.info_outline, size: 14, color: tokens.muted),
           ]),
           tooltip: '¿Qué es ${(muscleGroupLabels[group] ?? group).toLowerCase()}?',
           onPressed: () => showMuscleGroupInfo(context, group),
           visualDensity: VisualDensity.compact,
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          labelStyle: Theme.of(context).textTheme.labelSmall,
+          labelStyle: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
     ]);
   }
@@ -249,34 +257,114 @@ class WeekDayRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final tokens = FitTokens.of(context);
+    final radius = BorderRadius.circular(14);
     return Semantics(
       button: true,
       selected: selected,
       label: '${dayNames[day - 1]}: ${selected ? 'entrenamiento' : 'descanso'}',
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-          child: Row(children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: selected ? scheme.primary : scheme.surfaceContainerHighest,
-              child: Text(dayInitials[day - 1], style: TextStyle(fontWeight: FontWeight.w700, color: selected ? scheme.onPrimary : scheme.onSurfaceVariant)),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          decoration: BoxDecoration(
+            color: selected ? scheme.primary.withValues(alpha: 0.10) : tokens.rest.withValues(alpha: 0.05),
+            borderRadius: radius,
+            border: Border.all(color: selected ? scheme.primary.withValues(alpha: 0.35) : tokens.border),
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              borderRadius: radius,
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 10),
+                child: Row(children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: selected ? scheme.primary : tokens.cardHigh, borderRadius: BorderRadius.circular(10)),
+                    child: Text(dayInitials[day - 1], style: TextStyle(fontWeight: FontWeight.w800, color: selected ? scheme.onPrimary : tokens.muted)),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(width: 84, child: Text(dayNames[day - 1], style: const TextStyle(fontWeight: FontWeight.w700))),
+                  Expanded(
+                    child: selected
+                        ? Text(label ?? 'Entrenamiento', key: Key('day-plan-$day'), overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.9)))
+                        : Row(children: [
+                            Icon(Icons.bedtime_outlined, size: 16, color: tokens.rest),
+                            const SizedBox(width: 6),
+                            Flexible(child: Text('Descanso', key: Key('day-rest-$day'), overflow: TextOverflow.ellipsis, style: TextStyle(color: tokens.muted))),
+                          ]),
+                  ),
+                  const SizedBox(width: 8),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
+                    child: Icon(selected ? Icons.check_circle : Icons.add_circle_outline, key: ValueKey(selected), color: selected ? tokens.accent : scheme.outline),
+                  ),
+                ]),
+              ),
             ),
-            const SizedBox(width: 12),
-            SizedBox(width: 84, child: Text(dayNames[day - 1], style: const TextStyle(fontWeight: FontWeight.w600))),
-            Expanded(
-              child: selected
-                  ? Text(label ?? 'Entrenamiento', key: Key('day-plan-$day'), overflow: TextOverflow.ellipsis)
-                  : Row(children: [
-                      Icon(Icons.bedtime_outlined, size: 16, color: scheme.onSurfaceVariant),
-                      const SizedBox(width: 4),
-                      Text('Descanso', key: Key('day-rest-$day'), style: TextStyle(color: scheme.onSurfaceVariant)),
-                    ]),
-            ),
-            Icon(selected ? Icons.check_circle : Icons.add_circle_outline, color: selected ? scheme.primary : scheme.outline),
-          ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Un ejercicio de la sesión: número, nombre en negrita y la indicación como píldora.
+class ExerciseItem extends StatelessWidget {
+  const ExerciseItem({super.key, required this.index, required this.name, required this.prescription, this.icon, this.color, this.onTap, this.trailing});
+  final int? index;
+  final String name;
+  final String prescription;
+  final IconData? icon;
+  final Color? color;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+
+  static IconData prescriptionIcon(String text) => RegExp(r'segundo|minuto').hasMatch(text) ? Icons.timer_outlined : Icons.repeat_rounded;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = FitTokens.of(context);
+    final base = color ?? tokens.accent;
+    final radius = BorderRadius.circular(14);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: tokens.cardHigh,
+        shape: RoundedRectangleBorder(borderRadius: radius, side: BorderSide(color: tokens.border)),
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: base.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10), border: Border.all(color: base.withValues(alpha: 0.25))),
+                child: index != null
+                    ? Text('${index! + 1}', style: TextStyle(fontWeight: FontWeight.w800, color: base, fontFeatures: tabularFigures))
+                    : Icon(icon ?? Icons.fitness_center, size: 18, color: base),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                  const SizedBox(height: 6),
+                  Pill(prescription, icon: prescriptionIcon(prescription)),
+                ]),
+              ),
+              ?trailing,
+            ]),
+          ),
         ),
       ),
     );
@@ -294,8 +382,8 @@ class HintLine extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(icon, size: 16, color: Theme.of(context).colorScheme.tertiary),
-        const SizedBox(width: 6),
+        Icon(icon, size: 16, color: FitTokens.of(context).info),
+        const SizedBox(width: 8),
         Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
       ]),
     );
@@ -311,22 +399,34 @@ class WeekPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final tokens = FitTokens.of(context);
     return Row(children: [
       for (var day = 1; day <= 7; day++)
         Padding(
-          padding: const EdgeInsets.only(right: 4),
+          padding: const EdgeInsets.only(right: 5),
           child: Tooltip(
             message: '${dayNames[day - 1]}: ${trainingDays.contains(day) ? labels[day] ?? 'entrenamiento' : 'descanso'}',
-            child: CircleAvatar(
-              radius: 12,
-              backgroundColor: trainingDays.contains(day) ? scheme.primary : scheme.surfaceContainerHighest,
-              child: Text(dayInitials[day - 1], style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: trainingDays.contains(day) ? scheme.onPrimary : scheme.onSurfaceVariant)),
+            child: Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: trainingDays.contains(day) ? scheme.primary : tokens.cardHigh,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: trainingDays.contains(day) ? Colors.transparent : tokens.border),
+              ),
+              child: Text(dayInitials[day - 1], style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: trainingDays.contains(day) ? scheme.onPrimary : tokens.muted)),
             ),
           ),
         ),
     ]);
   }
 }
+
+/// Nombre corto de una rutina para usarlo como título: el catálogo arma nombres como «Upper/Lower · Mantener peso · Con
+/// experiencia · Con equipo · IMC normal»; el título es solo la primera parte («Upper / Lower») y el resto se muestra como
+/// etiquetas.
+String routineTitle(String name) => name.split(' · ').first.replaceAll(RegExp(r'\s*/\s*'), ' / ').trim();
 
 /// 2200 → «2.200»; 1.55 → «1,55».
 String formatNumber(num value) {
@@ -423,15 +523,17 @@ class _LoaderState<T> extends State<Loader<T>> {
           return const Center(child: CircularProgressIndicator(key: Key('loading')));
         }
         if (snapshot.hasError) {
-          return ListView(
-            padding: const EdgeInsets.all(24),
+          return PageList(
+            maxWidth: 520,
             children: [
               const SizedBox(height: 48),
-              Icon(Icons.cloud_off, size: 48, color: Theme.of(context).colorScheme.error),
-              const SizedBox(height: 12),
-              Text(errorText(snapshot.error!), textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              Center(child: FilledButton.icon(onPressed: _reload, icon: const Icon(Icons.refresh), label: const Text('Reintentar'))),
+              EmptyState(
+                icon: Icons.cloud_off,
+                color: Theme.of(context).colorScheme.error,
+                title: 'No pudimos cargar esta pantalla',
+                message: Text(errorText(snapshot.error!)),
+                action: FilledButton.icon(onPressed: _reload, icon: const Icon(Icons.refresh), label: const Text('Reintentar')),
+              ),
             ],
           );
         }
@@ -441,52 +543,55 @@ class _LoaderState<T> extends State<Loader<T>> {
   }
 }
 
+/// Tarjeta con título (y, si se quiere, ícono y subtítulo): la unidad básica de cada pantalla.
 class SectionCard extends StatelessWidget {
-  const SectionCard({super.key, required this.title, required this.children, this.trailing});
+  const SectionCard({super.key, required this.title, required this.children, this.trailing, this.icon, this.iconColor, this.subtitle, this.hero = false});
   final String title;
   final List<Widget> children;
   final Widget? trailing;
+  final IconData? icon;
+  final Color? iconColor;
+  final String? subtitle;
+  final bool hero;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
-                ?trailing,
-              ],
-            ),
-            const SizedBox(height: 8),
-            ...children,
-          ],
-        ),
+    final tokens = FitTokens.of(context);
+    final wide = MediaQuery.sizeOf(context).width >= kShellBreakpoint;
+    return FitCard(
+      hero: hero,
+      padding: EdgeInsets.all(wide ? 20 : 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (icon != null) ...[IconBadge(icon!, color: iconColor, size: 34), const SizedBox(width: 12)],
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.2)),
+                  if (subtitle != null) Text(subtitle!, style: TextStyle(fontSize: 12.5, color: tokens.muted)),
+                ]),
+              ),
+              ?trailing,
+            ],
+          ),
+          SizedBox(height: wide ? 12 : 8),
+          ...children,
+        ],
       ),
     );
   }
 }
 
 class StatusChip extends StatelessWidget {
-  const StatusChip(this.text, {super.key, this.color});
+  const StatusChip(this.text, {super.key, this.color, this.icon});
   final String text;
   final Color? color;
+  final IconData? icon;
 
   @override
-  Widget build(BuildContext context) {
-    final base = color ?? Theme.of(context).colorScheme.primary;
-    return Chip(
-      label: Text(text),
-      visualDensity: VisualDensity.compact,
-      side: BorderSide(color: base),
-      backgroundColor: base.withValues(alpha: 0.1),
-      labelStyle: TextStyle(color: base, fontWeight: FontWeight.w600),
-    );
-  }
+  Widget build(BuildContext context) => Pill(text, icon: icon, color: color ?? FitTokens.of(context).accent, strong: true);
 }
 
 Future<String?> askText(
@@ -534,9 +639,11 @@ Future<String?> askText(
 
 /// Menú de cuenta: tema de la app (sistema, claro u oscuro), cambio de contraseña y cierre de sesión.
 class AccountMenu extends StatelessWidget {
-  const AccountMenu({super.key, required this.api, required this.onLogout});
+  const AccountMenu({super.key, required this.api, required this.onLogout, this.child});
   final ApiClient api;
   final Future<void> Function() onLogout;
+  /// Lo que se toca para abrir el menú; si falta, un ícono de cuenta.
+  final Widget? child;
 
   Future<void> _changePassword(BuildContext context) async {
     final current = TextEditingController();
@@ -573,8 +680,10 @@ class AccountMenu extends StatelessWidget {
     final theme = AppSettings.maybeOf(context);
     return PopupMenuButton<String>(
       key: const Key('account-menu'),
-      icon: const Icon(Icons.account_circle_outlined),
+      icon: child == null ? const Icon(Icons.account_circle_outlined) : null,
       tooltip: 'Cuenta y tema',
+      position: child == null ? PopupMenuPosition.under : PopupMenuPosition.over,
+      child: child,
       onSelected: (value) {
         if (value == 'password') _changePassword(context);
         if (value == 'logout') onLogout();

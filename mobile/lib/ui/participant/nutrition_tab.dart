@@ -30,14 +30,18 @@ class _NutritionTabState extends State<NutritionTab> {
         final selected = plans.firstWhere((plan) => plan['diet'] == _diet, orElse: () => plans.first);
         final average = selected['average'] as Map<String, dynamic>;
         final percent = average['percent'] as Map<String, dynamic>;
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            SectionCard(
-              title: 'Tus calorías',
-              children: [
+        final tokens = FitTokens.of(context);
+        final goalKcal = (target?['targetKcal'] ?? selected['referenceKcal']) as num;
+        final calories = FitCard(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            IconBadge(Icons.local_fire_department_outlined, color: tokens.streak, size: 44),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Tus calorías', style: TextStyle(color: tokens.muted, fontWeight: FontWeight.w700, fontSize: 12.5, letterSpacing: 0.3)),
+                const SizedBox(height: 4),
                 if (target != null) ...[
-                  Text('${_capitalize(target['label'] as String)}: ${formatNumber(target['targetKcal'] as num)} kcal al día', key: const Key('nutrition-target'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  Text('${_capitalize(target['label'] as String)}: ${formatNumber(target['targetKcal'] as num)} kcal al día', key: const Key('nutrition-target'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: -0.4, fontFeatures: tabularFigures)),
                   const SizedBox(height: 4),
                   Text(
                     'Mantenimiento estimado: ${formatNumber(target['maintenanceKcal'] as num)} kcal (Mifflin-St Jeor × ${formatNumber(target['activityFactor'] as num)})'
@@ -45,39 +49,50 @@ class _NutritionTabState extends State<NutritionTab> {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ] else ...[
-                  Text('Porciones de referencia: ${formatNumber(selected['referenceKcal'] as num)} kcal al día', key: const Key('nutrition-reference'), style: const TextStyle(fontWeight: FontWeight.w700)),
-                  if (data['objectiveLabel'] != null) Text('Tu objetivo es ${data['objectiveLabel']}: con tus datos ajustamos los gramos a tus calorías.', style: Theme.of(context).textTheme.bodySmall),
-                  Align(alignment: Alignment.centerLeft, child: TextButton(key: const Key('go-profile-nutrition'), onPressed: widget.onGoToProfile, child: const Text('Completar mis datos'))),
+                  Text('Porciones de referencia: ${formatNumber(selected['referenceKcal'] as num)} kcal al día', key: const Key('nutrition-reference'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.3)),
+                  if (data['objectiveLabel'] != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text('Tu objetivo es ${data['objectiveLabel']}: con tus datos ajustamos los gramos a tus calorías.', style: Theme.of(context).textTheme.bodySmall)),
+                  Align(alignment: Alignment.centerLeft, child: TextButton.icon(key: const Key('go-profile-nutrition'), onPressed: widget.onGoToProfile, icon: const Icon(Icons.tune, size: 18), label: const Text('Completar mis datos'))),
                 ],
                 for (final notice in notices)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Padding(padding: EdgeInsets.only(top: 2, right: 6), child: Icon(Icons.info_outline, size: 16)),
-                      Expanded(child: Text(notice['text'] as String, key: Key('nutrition-notice-${notice['code']}'), style: Theme.of(context).textTheme.bodySmall)),
-                    ]),
-                  ),
-              ],
+                  Callout(child: Text(notice['text'] as String, key: Key('nutrition-notice-${notice['code']}'))),
+              ]),
             ),
-            Text('Elige tu dieta', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 4),
-            Wrap(spacing: 8, runSpacing: 4, children: [
+          ]),
+        );
+        final diets = FitCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Elige tu dieta', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 8, children: [
               for (final plan in plans)
-                ChoiceChip(key: Key('diet-${plan['diet']}'), label: Text(dietLabels[plan['diet']] ?? plan['name'] as String), selected: plan['id'] == selected['id'], onSelected: (_) => setState(() => _diet = plan['diet'] as String)),
+                ChoiceChip(
+                  key: Key('diet-${plan['diet']}'),
+                  avatar: Icon(_dietIcons[plan['diet']] ?? Icons.restaurant, size: 16),
+                  showCheckmark: false,
+                  label: Text(dietLabels[plan['diet']] ?? plan['name'] as String),
+                  selected: plan['id'] == selected['id'],
+                  onSelected: (_) => setState(() => _diet = plan['diet'] as String),
+                ),
             ]),
-            const SizedBox(height: 8),
-            Text(selected['summary'] as String, key: const Key('diet-summary')),
-            const SizedBox(height: 4),
-            Text('Proteínas ${percent['protein']} % · Carbohidratos ${percent['carbs']} % · Grasas ${percent['fat']} % de la energía', key: const Key('diet-macros'), style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 12),
-            _MealPlanDays(key: ValueKey(selected['id']), api: widget.api, planId: selected['id'] as String, day: _day, onDay: (day) => setState(() => _day = day)),
+            Text(selected['summary'] as String, key: const Key('diet-summary'), style: const TextStyle(height: 1.4)),
+            const SizedBox(height: 6),
+            Text('Proteínas ${percent['protein']} % · Carbohidratos ${percent['carbs']} % · Grasas ${percent['fat']} % de la energía', key: const Key('diet-macros'), style: Theme.of(context).textTheme.bodySmall),
+          ]),
+        );
+        return PageList(
+          children: [
+            BentoColumns(primaryFlex: 5, secondaryFlex: 7, breakpoint: 900, primary: [calories], secondary: [diets]),
+            _MealPlanDays(key: ValueKey(selected['id']), api: widget.api, planId: selected['id'] as String, day: _day, goalKcal: goalKcal, onDay: (day) => setState(() => _day = day)),
             const SizedBox(height: 8),
-            Text(data['disclaimer'] as String, key: const Key('nutrition-disclaimer'), style: const TextStyle(fontSize: 12)),
+            Text(data['disclaimer'] as String, key: const Key('nutrition-disclaimer'), style: Theme.of(context).textTheme.bodySmall),
           ],
         );
       },
     );
   }
+
+  static const _dietIcons = {'mediterranea': Icons.set_meal_outlined, 'alta_proteina': Icons.egg_alt_outlined, 'baja_carbohidratos': Icons.grass, 'vegetariana': Icons.eco_outlined};
 
   static String _capitalize(String text) => text.isEmpty ? text : '${text[0].toUpperCase()}${text.substring(1)}';
 }
@@ -85,10 +100,12 @@ class _NutritionTabState extends State<NutritionTab> {
 /// Los 7 días de la pauta elegida: comidas con alimentos, gramos, medida casera y macronutrientes. Tocar un alimento permite
 /// cambiarlo por otro equivalente si no lo tienes.
 class _MealPlanDays extends StatefulWidget {
-  const _MealPlanDays({super.key, required this.api, required this.planId, required this.day, required this.onDay});
+  const _MealPlanDays({super.key, required this.api, required this.planId, required this.day, required this.goalKcal, required this.onDay});
   final ApiClient api;
   final String planId;
   final int day;
+  /// Calorías del objetivo (o de las porciones de referencia), para comparar el total del día.
+  final num goalKcal;
   final ValueChanged<int> onDay;
 
   @override
@@ -139,11 +156,20 @@ class _MealPlanDaysState extends State<_MealPlanDays> {
     }
   }
 
+  static const _mealIcons = {
+    'desayuno': Icons.free_breakfast_outlined,
+    'colacion': Icons.apple,
+    'almuerzo': Icons.lunch_dining_outlined,
+    'once': Icons.coffee_outlined,
+    'cena': Icons.dinner_dining_outlined,
+  };
+
   @override
   Widget build(BuildContext context) {
     final day = widget.day;
     final onDay = widget.onDay;
     final scheme = Theme.of(context).colorScheme;
+    final tokens = FitTokens.of(context);
     return FutureBuilder<Object?>(
       future: _detail,
       builder: (context, snapshot) {
@@ -154,55 +180,256 @@ class _MealPlanDaysState extends State<_MealPlanDays> {
         final current = days.firstWhere((item) => item['dayNo'] == day, orElse: () => days.first);
         final totals = current['totals'] as Map<String, dynamic>;
         final swaps = detail['swaps'] as int? ?? 0;
+        final meals = (current['meals'] as List).cast<Map<String, dynamic>>();
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Wrap(spacing: 6, children: [
+            // Días de la semana: un selector horizontal de siete botones iguales.
+            Row(children: [
               for (final item in days)
-                ChoiceChip(key: Key('meal-day-${item['dayNo']}'), label: Text(dayInitials[(item['dayNo'] as int) - 1]), tooltip: item['dayLabel'] as String, selected: item['dayNo'] == current['dayNo'], onSelected: (_) => onDay(item['dayNo'] as int)),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: _DayButton(
+                      key: Key('meal-day-${item['dayNo']}'),
+                      label: dayInitials[(item['dayNo'] as int) - 1],
+                      tooltip: item['dayLabel'] as String,
+                      selected: item['dayNo'] == current['dayNo'],
+                      onTap: () => onDay(item['dayNo'] as int),
+                    ),
+                  ),
+                ),
             ]),
-            const SizedBox(height: 8),
-            Text('${current['dayLabel']}: ${formatNumber(totals['kcal'] as num)} kcal · ${_macros(totals)}', key: const Key('meal-day-totals'), style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 16),
+            _NutritionPanel(dayLabel: current['dayLabel'] as String, totals: totals, goalKcal: widget.goalKcal, totalsText: Text('${current['dayLabel']}: ${formatNumber(totals['kcal'] as num)} kcal · ${_macros(totals)}', key: const Key('meal-day-totals'), style: Theme.of(context).textTheme.bodySmall)),
             const HintLine('¿No tienes un alimento? Tócalo y cámbialo por otro equivalente aprobado por la nutricionista.', icon: Icons.swap_horiz),
             if (swaps > 0)
-              Row(children: [
-                Expanded(child: Text('Cambiaste ${swaps == 1 ? '1 alimento' : '$swaps alimentos'} de esta pauta.', key: const Key('swaps-count'), style: Theme.of(context).textTheme.bodySmall)),
-                TextButton(key: const Key('undo-swaps'), onPressed: _undoAll, child: const Text('Volver a la original')),
-              ]),
-            const SizedBox(height: 8),
-            for (final meal in (current['meals'] as List).cast<Map<String, dynamic>>())
-              SectionCard(
-                title: '${meal['label']} · ${formatNumber((meal['totals'] as Map)['kcal'] as num)} kcal',
-                children: [
-                  for (final item in (meal['items'] as List).cast<Map<String, dynamic>>())
-                    InkWell(
-                      key: Key('meal-swap-${meal['meal']}-${item['position']}'),
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () => _swap(current, meal, item),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(item['name'] as String),
-                              if (item['swappedFrom'] != null)
-                                Text('En vez de ${((item['swappedFrom'] as Map)['name'] as String).toLowerCase()}', key: Key('meal-swapped-${meal['meal']}-${item['position']}'), style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: scheme.primary)),
-                            ]),
-                          ),
-                          const SizedBox(width: 8),
-                          Text('${formatNumber(item['grams'] as num)} g${item['household'] == null ? '' : '\n${item['household']}'}', key: Key('meal-item-${meal['meal']}-${item['code']}'), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w600)),
-                          const SizedBox(width: 6),
-                          Icon(Icons.swap_horiz, size: 18, color: item['swappedFrom'] != null ? scheme.primary : scheme.outline),
-                        ]),
-                      ),
-                    ),
-                  const Divider(height: 12),
-                  Text(_macros((meal['totals'] as Map).cast<String, dynamic>()), style: Theme.of(context).textTheme.bodySmall),
-                ],
+              Callout(
+                icon: Icons.swap_horiz,
+                color: tokens.accent,
+                child: Row(children: [
+                  Expanded(child: Text('Cambiaste ${swaps == 1 ? '1 alimento' : '$swaps alimentos'} de esta pauta.', key: const Key('swaps-count'))),
+                  TextButton(key: const Key('undo-swaps'), onPressed: _undoAll, child: const Text('Volver a la original')),
+                ]),
               ),
+            const SizedBox(height: 16),
+            ResponsiveGrid(
+              minItemWidth: 380,
+              children: [
+                for (final meal in meals)
+                  FitCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        IconBadge(_mealIcons[meal['meal']] ?? Icons.restaurant, color: tokens.carbs, size: 36),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text(meal['label'] as String, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: -0.2))),
+                        Pill('${formatNumber((meal['totals'] as Map)['kcal'] as num)} kcal', color: tokens.accent, strong: true),
+                      ]),
+                      const SizedBox(height: 10),
+                      for (final item in (meal['items'] as List).cast<Map<String, dynamic>>())
+                        _FoodRow(
+                          key: Key('meal-swap-${meal['meal']}-${item['position']}'),
+                          meal: meal['meal'] as String,
+                          item: item,
+                          onTap: () => _swap(current, meal, item),
+                        ),
+                      Divider(height: 20, color: tokens.border),
+                      Wrap(spacing: 6, runSpacing: 6, children: [
+                        Pill('P ${(meal['totals'] as Map)['protein']} g', color: tokens.protein),
+                        Pill('C ${(meal['totals'] as Map)['carbs']} g', color: tokens.carbs),
+                        Pill('G ${(meal['totals'] as Map)['fat']} g', color: tokens.fat),
+                      ]),
+                    ]),
+                  ),
+              ],
+            ),
           ],
         );
       },
+    );
+  }
+}
+
+/// Un día en el selector de la pauta.
+class _DayButton extends StatelessWidget {
+  const _DayButton({super.key, required this.label, required this.tooltip, required this.selected, required this.onTap});
+  final String label;
+  final String tooltip;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final tokens = FitTokens.of(context);
+    final radius = BorderRadius.circular(12);
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: tooltip,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 44,
+          decoration: BoxDecoration(
+            color: selected ? scheme.primary : tokens.card,
+            borderRadius: radius,
+            border: Border.all(color: selected ? Colors.transparent : tokens.border),
+            boxShadow: [if (selected) BoxShadow(color: scheme.primary.withValues(alpha: 0.35), blurRadius: 14, spreadRadius: -4, offset: const Offset(0, 4))],
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              borderRadius: radius,
+              onTap: onTap,
+              child: Center(child: Text(label, style: TextStyle(fontWeight: FontWeight.w800, color: selected ? scheme.onPrimary : tokens.muted))),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Panel del día: calorías frente al objetivo y una barra por macronutriente, con su color.
+class _NutritionPanel extends StatelessWidget {
+  const _NutritionPanel({required this.dayLabel, required this.totals, required this.goalKcal, required this.totalsText});
+  final String dayLabel;
+  final Map<String, dynamic> totals;
+  final num goalKcal;
+  final Widget totalsText;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = FitTokens.of(context);
+    final kcal = totals['kcal'] as num;
+    final percent = (totals['percent'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+    int share(String key, int factor) => (percent[key] as num?)?.round() ?? (kcal > 0 ? ((totals[key] as num) * factor * 100 / kcal).round() : 0);
+    final macros = [
+      (label: 'Proteínas', grams: totals['protein'] as num, share: share('protein', 4), color: tokens.protein, icon: Icons.egg_outlined),
+      (label: 'Carbohidratos', grams: totals['carbs'] as num, share: share('carbs', 4), color: tokens.carbs, icon: Icons.bakery_dining_outlined),
+      (label: 'Grasas', grams: totals['fat'] as num, share: share('fat', 9), color: tokens.fat, icon: Icons.water_drop_outlined),
+    ];
+    final ring = SizedBox(
+      width: 132,
+      height: 132,
+      child: Stack(fit: StackFit.expand, children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: goalKcal > 0 ? (kcal / goalKcal).clamp(0.0, 1.0).toDouble() : 0),
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, _) => CircularProgressIndicator(value: value, strokeWidth: 10, strokeCap: StrokeCap.round, backgroundColor: tokens.border, color: Theme.of(context).colorScheme.primary),
+        ),
+        Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(formatNumber(kcal), style: const TextStyle(fontSize: 28, height: 1, fontWeight: FontWeight.w800, letterSpacing: -1, fontFeatures: tabularFigures)),
+            const SizedBox(height: 4),
+            Text('de ${formatNumber(goalKcal)} kcal', style: TextStyle(fontSize: 11.5, color: tokens.muted, fontWeight: FontWeight.w600)),
+          ]),
+        ),
+      ]),
+    );
+    final bars = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (final macro in macros)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Icon(macro.icon, size: 16, color: macro.color),
+              const SizedBox(width: 6),
+              Expanded(child: Text(macro.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+              Text('${formatNumber(macro.grams)} g · ${macro.share} %', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: macro.color, fontFeatures: tabularFigures)),
+            ]),
+            const SizedBox(height: 6),
+            MeterBar(value: macro.share / 100, color: macro.color),
+          ]),
+        ),
+    ]);
+    return FitCard(
+      hero: true,
+      child: LayoutBuilder(builder: (context, constraints) {
+        final heading = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(dayLabel, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          totalsText,
+        ]);
+        if (constraints.maxWidth < 520) {
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [ring, const SizedBox(width: 16), Expanded(child: heading)]),
+            const SizedBox(height: 16),
+            bars,
+          ]);
+        }
+        return Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          ring,
+          const SizedBox(width: 28),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [heading, const SizedBox(height: 14), bars])),
+        ]);
+      }),
+    );
+  }
+}
+
+/// Un alimento de la comida: se nota que se puede tocar para cambiarlo. Muestra los gramos y la medida casera.
+class _FoodRow extends StatefulWidget {
+  const _FoodRow({super.key, required this.meal, required this.item, required this.onTap});
+  final String meal;
+  final Map<String, dynamic> item;
+  final VoidCallback onTap;
+
+  @override
+  State<_FoodRow> createState() => _FoodRowState();
+}
+
+class _FoodRowState extends State<_FoodRow> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = FitTokens.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final item = widget.item;
+    final swapped = item['swappedFrom'] != null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: widget.onTap,
+        onHover: (value) => setState(() => _hover = value),
+        hoverColor: scheme.onSurface.withValues(alpha: 0.05),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+          child: Row(children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(item['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
+                if (swapped)
+                  Text('En vez de ${((item['swappedFrom'] as Map)['name'] as String).toLowerCase()}', key: Key('meal-swapped-${widget.meal}-${item['position']}'), style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: tokens.accent)),
+              ]),
+            ),
+            const SizedBox(width: 8),
+            if (item['household'] != null) ...[Pill(item['household'] as String), const SizedBox(width: 10)],
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 48),
+              child: Text('${formatNumber(item['grams'] as num)} g', key: Key('meal-item-${widget.meal}-${item['code']}'), textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, fontFeatures: tabularFigures)),
+            ),
+            const SizedBox(width: 10),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: swapped || _hover ? scheme.primary.withValues(alpha: 0.16) : tokens.cardHigh,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: swapped || _hover ? scheme.primary.withValues(alpha: 0.4) : tokens.border),
+              ),
+              child: Icon(Icons.swap_horiz, size: 18, color: swapped || _hover ? tokens.accent : tokens.muted),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 }

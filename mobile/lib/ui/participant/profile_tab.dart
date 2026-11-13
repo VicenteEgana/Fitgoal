@@ -61,6 +61,12 @@ class _ProfileFormState extends State<ProfileForm> {
   String? _daysError;
   bool _busy = false;
   late Map<String, bool> _consents;
+  /// Cómo estaba el formulario la última vez que se guardó, para avisar si hay cambios sin guardar.
+  late String _saved;
+
+  String _snapshot() => [_age.text, _weight.text, _height.text, _objective, _level, _equipment, _duration, (_days.toList()..sort()).join(','), _sex, _activity].join('|');
+
+  bool get _dirty => _snapshot() != _saved;
 
   @override
   void initState() {
@@ -77,6 +83,7 @@ class _ProfileFormState extends State<ProfileForm> {
     _sex = profile?['sexParam'] as String?;
     _activity = profile?['activityLevel'] as String?;
     _consents = {...widget.consents};
+    _saved = _snapshot();
   }
 
   @override
@@ -131,6 +138,7 @@ class _ProfileFormState extends State<ProfileForm> {
         if (nutrition) ...{'sexParam': _sex, 'activityLevel': _activity},
       }) as Map<String, dynamic>;
       final version = (result['profile'] as Map)['version'];
+      if (mounted) setState(() => _saved = _snapshot());
       if (mounted) showMessage(context, 'Perfil guardado (versión $version). Tu rutina actual no cambia: mira las recomendadas para tu perfil.');
       await widget.onSaved();
     } on ApiException catch (error) {
@@ -211,116 +219,167 @@ class _ProfileFormState extends State<ProfileForm> {
     }
   }
 
+  /// IMC con los valores escritos, como referencia mientras se edita (el oficial lo calcula el servidor al guardar).
+  double? get _liveBmi {
+    final weight = double.tryParse(_weight.text.replaceAll(',', '.'));
+    final height = double.tryParse(_height.text.replaceAll(',', '.'));
+    if (weight == null || height == null || height < 100 || height > 250 || weight < 30 || weight > 300) return null;
+    return weight / ((height / 100) * (height / 100));
+  }
+
+  Widget _consentTile(Widget tile) {
+    final tokens = FitTokens.of(context);
+    // Un Material propio para que el interruptor muestre su efecto al tocarlo sobre el fondo de la tarjeta.
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Material(
+        color: tokens.cardHigh,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: tokens.border)),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), child: tile),
+      ),
+    );
+  }
+
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.only(top: 18, bottom: 8),
+    child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+  );
+
   @override
   Widget build(BuildContext context) {
-    return Form(
-      key: _formKey,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          SectionCard(
-            title: widget.profile == null ? 'Tu perfil' : 'Tu perfil (versión ${widget.profile!['version']})',
+    final tokens = FitTokens.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final age = TextFormField(
+      key: const Key('age'),
+      controller: _age,
+      keyboardType: TextInputType.number,
+      decoration: const InputDecoration(labelText: 'Edad', suffixText: 'años', prefixIcon: Icon(Icons.cake_outlined), errorMaxLines: 3),
+      validator: _validateAge,
+    );
+    final height = TextFormField(key: const Key('height'), controller: _height, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Estatura', suffixText: 'cm', prefixIcon: Icon(Icons.height), errorMaxLines: 2), validator: (value) => _validateBody(value, 100, 250, 'Entre 100 y 250 cm.'));
+    final weight = TextFormField(key: const Key('weight'), controller: _weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Peso', suffixText: 'kg', prefixIcon: Icon(Icons.monitor_weight_outlined), errorMaxLines: 2), validator: (value) => _validateBody(value, 30, 300, 'Entre 30 y 300 kg.'));
+    final objective = DropdownButtonFormField<String>(
+      key: const Key('objective'),
+      initialValue: _objective,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Objetivo', prefixIcon: Icon(Icons.flag_outlined)),
+      items: [for (final entry in objectiveLabels.entries) DropdownMenuItem(value: entry.key, child: Text(entry.value))],
+      onChanged: (value) => setState(() => _objective = value!),
+    );
+    final level = DropdownButtonFormField<String>(
+      key: const Key('level'),
+      initialValue: _level,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Nivel de experiencia', prefixIcon: Icon(Icons.bolt_outlined)),
+      items: [for (final entry in levelLabels.entries) DropdownMenuItem(value: entry.key, child: Text(entry.value))],
+      onChanged: (value) => setState(() => _level = value!),
+    );
+    final equipment = DropdownButtonFormField<String>(
+      key: const Key('equipment'),
+      initialValue: _equipment,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Equipamiento', prefixIcon: Icon(Icons.fitness_center)),
+      items: [for (final entry in equipmentLabels.entries) DropdownMenuItem(value: entry.key, child: Text(entry.value))],
+      onChanged: (value) => setState(() => _equipment = value!),
+    );
+    final profileCard = SectionCard(
+      title: widget.profile == null ? 'Tu perfil' : 'Tu perfil (versión ${widget.profile!['version']})',
+      icon: Icons.person_outline,
+      children: [
+        // Edad y objetivo juntos en pantallas anchas; uno bajo el otro en el teléfono.
+        LayoutBuilder(builder: (context, constraints) => constraints.maxWidth >= 480
+            ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(flex: 2, child: age), const SizedBox(width: 10), Expanded(flex: 3, child: objective)])
+            : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [age, const SizedBox(height: 12), objective])),
+        const SizedBox(height: 12),
+        LayoutBuilder(builder: (context, constraints) => constraints.maxWidth >= 480
+            ? Row(children: [Expanded(child: level), const SizedBox(width: 10), Expanded(child: equipment)])
+            : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [level, const SizedBox(height: 12), equipment])),
+        _label('Días disponibles'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (var day = 1; day <= 7; day++)
+              FilterChip(
+                key: Key('day-$day'),
+                label: Text(dayInitials[day - 1]),
+                tooltip: dayNames[day - 1],
+                showCheckmark: false,
+                selected: _days.contains(day),
+                onSelected: (selected) => setState(() {
+                  selected ? _days.add(day) : _days.remove(day);
+                  _daysError = null;
+                }),
+              ),
+          ],
+        ),
+        if (_daysError != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_daysError!, key: const Key('days-error'), style: TextStyle(color: scheme.error))),
+        _label('Minutos por sesión'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final minutes in const [20, 30, 45, 60])
+              ChoiceChip(key: Key('duration-$minutes'), avatar: const Icon(Icons.timer_outlined, size: 16), showCheckmark: false, label: Text('$minutes min'), selected: _duration == minutes, onSelected: (_) => setState(() => _duration = minutes)),
+          ],
+        ),
+        // Dato de salud opcional: el permiso va junto a los campos que habilita.
+        _label('Estatura y peso (opcional)'),
+        _consentTile(SwitchListTile(
+          key: const Key('consent-body-data'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Usar mi estatura y peso para recomendarme rutinas', style: TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: const Text('Es un dato de salud y es opcional. Con él calculamos tu IMC y afinamos las recomendaciones. Puedes revocarlo cuando quieras y se borra, junto con tu historial de peso.'),
+          value: _bodyOn,
+          onChanged: (value) => _toggleConsent('datos_corporales', value),
+        )),
+        if (_bodyOn) ...[
+          const SizedBox(height: 14),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: height), const SizedBox(width: 10), Expanded(child: weight)]),
+          const SizedBox(height: 10),
+          Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, runSpacing: 6, children: [
+            // Al escribir, solo se redibuja esta etiqueta (no todo el formulario).
+            ListenableBuilder(
+              listenable: Listenable.merge([_weight, _height]),
+              builder: (context, _) {
+                final bmi = _liveBmi;
+                final bmiColor = bmi == null ? tokens.muted : bmi < 18.5 ? tokens.info : bmi < 25 ? tokens.accent : bmi < 30 ? tokens.streak : tokens.danger;
+                return Pill(
+                  bmi == null ? 'IMC: completa estatura y peso' : 'IMC con estos datos: ${bmi.toStringAsFixed(1).replaceAll('.', ',')}',
+                  icon: Icons.speed,
+                  color: bmiColor,
+                  strong: true,
+                );
+              },
+            ),
+            if (widget.profile?['bmi'] != null)
+              Text('Tu IMC: ${_formatBmi(widget.profile!['bmi'])} · ${bmiLabels[widget.profile!['bmiCategory']]}. Es solo una referencia: no distingue músculo de grasa.', key: const Key('bmi-text'), style: Theme.of(context).textTheme.bodySmall),
+          ]),
+        ],
+      ],
+    );
+    final nutritionCard = _bodyOn
+        ? SectionCard(
+            title: 'Datos para tu pauta de alimentación',
+            icon: Icons.restaurant_menu,
+            iconColor: tokens.carbs,
             children: [
-              TextFormField(
-                key: const Key('age'),
-                controller: _age,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Edad', border: OutlineInputBorder()),
-                validator: _validateAge,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: const Key('objective'),
-                initialValue: _objective,
-                decoration: const InputDecoration(labelText: 'Objetivo', border: OutlineInputBorder()),
-                items: [for (final entry in objectiveLabels.entries) DropdownMenuItem(value: entry.key, child: Text(entry.value))],
-                onChanged: (value) => setState(() => _objective = value!),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: const Key('level'),
-                initialValue: _level,
-                decoration: const InputDecoration(labelText: 'Nivel de experiencia', border: OutlineInputBorder()),
-                items: [for (final entry in levelLabels.entries) DropdownMenuItem(value: entry.key, child: Text(entry.value))],
-                onChanged: (value) => setState(() => _level = value!),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: const Key('equipment'),
-                initialValue: _equipment,
-                decoration: const InputDecoration(labelText: 'Equipamiento', border: OutlineInputBorder()),
-                items: [for (final entry in equipmentLabels.entries) DropdownMenuItem(value: entry.key, child: Text(entry.value))],
-                onChanged: (value) => setState(() => _equipment = value!),
-              ),
-              const SizedBox(height: 4),
-              SwitchListTile(
-                key: const Key('consent-body-data'),
+              _consentTile(SwitchListTile(
+                key: const Key('consent-nutrition'),
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Usar mi estatura y peso para recomendarme rutinas'),
-                subtitle: const Text('Es un dato de salud y es opcional. Con él calculamos tu IMC y afinamos las recomendaciones. Puedes revocarlo cuando quieras y se borra, junto con tu historial de peso.'),
-                value: _bodyOn,
-                onChanged: (value) => _toggleConsent('datos_corporales', value),
-              ),
-              if (_bodyOn) ...[
-                Row(children: [
-                  Expanded(child: TextFormField(key: const Key('height'), controller: _height, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Estatura (cm)', border: OutlineInputBorder()), validator: (value) => _validateBody(value, 100, 250, 'Entre 100 y 250 cm.'))),
-                  const SizedBox(width: 12),
-                  Expanded(child: TextFormField(key: const Key('weight'), controller: _weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Peso (kg)', border: OutlineInputBorder()), validator: (value) => _validateBody(value, 30, 300, 'Entre 30 y 300 kg.'))),
-                ]),
-                if (widget.profile?['bmi'] != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text('Tu IMC: ${_formatBmi(widget.profile!['bmi'])} · ${bmiLabels[widget.profile!['bmiCategory']]}. Es solo una referencia: no distingue músculo de grasa.', key: const Key('bmi-text'), style: Theme.of(context).textTheme.bodySmall),
-                  ),
-              ],
-              const SizedBox(height: 16),
-              Text('Días disponibles', style: Theme.of(context).textTheme.titleSmall),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (var day = 1; day <= 7; day++)
-                    FilterChip(
-                      key: Key('day-$day'),
-                      label: Text(dayInitials[day - 1]),
-                      tooltip: dayNames[day - 1],
-                      selected: _days.contains(day),
-                      onSelected: (selected) => setState(() {
-                        selected ? _days.add(day) : _days.remove(day);
-                        _daysError = null;
-                      }),
-                    ),
-                ],
-              ),
-              if (_daysError != null) Text(_daysError!, key: const Key('days-error'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              const SizedBox(height: 16),
-              Text('Minutos por sesión', style: Theme.of(context).textTheme.titleSmall),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final minutes in const [20, 30, 45, 60])
-                    ChoiceChip(key: Key('duration-$minutes'), label: Text('$minutes'), selected: _duration == minutes, onSelected: (_) => setState(() => _duration = minutes)),
-                ],
-              ),
-            ],
-          ),
-          if (_bodyOn)
-            SectionCard(
-              title: 'Datos para tu pauta de alimentación',
-              children: [
-                SwitchListTile(
-                  key: const Key('consent-nutrition'),
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Usar mi sexo y nivel de actividad para calcular mis calorías'),
-                  subtitle: const Text('Es opcional. Con tu estatura y peso estimamos tus calorías (Mifflin-St Jeor) y ajustamos los gramos de tu pauta a tu objetivo. Puedes revocarlo cuando quieras y se borran.'),
-                  value: _consents['datos_nutricionales'] ?? false,
-                  onChanged: (value) => _toggleConsent('datos_nutricionales', value),
-                ),
-                if (_nutritionOn) ...[
-                const SizedBox(height: 8),
+                title: const Text('Usar mi sexo y nivel de actividad para calcular mis calorías', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Es opcional. Con tu estatura y peso estimamos tus calorías (Mifflin-St Jeor) y ajustamos los gramos de tu pauta a tu objetivo. Puedes revocarlo cuando quieras y se borran.'),
+                value: _consents['datos_nutricionales'] ?? false,
+                onChanged: (value) => _toggleConsent('datos_nutricionales', value),
+              )),
+              if (_nutritionOn) ...[
+                const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
                   key: const Key('sex'),
                   initialValue: _sex,
-                  decoration: const InputDecoration(labelText: 'Sexo (parámetro de la fórmula)', border: OutlineInputBorder()),
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Sexo (parámetro de la fórmula)', prefixIcon: Icon(Icons.wc)),
                   items: [for (final entry in _sexLabels.entries) DropdownMenuItem(value: entry.key, child: Text(entry.value))],
                   onChanged: (value) => setState(() => _sex = value),
                 ),
@@ -329,51 +388,113 @@ class _ProfileFormState extends State<ProfileForm> {
                   key: const Key('activity'),
                   initialValue: _activity,
                   isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Nivel de actividad', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(labelText: 'Nivel de actividad', prefixIcon: Icon(Icons.directions_run)),
                   items: [for (final entry in _activityLabels.entries) DropdownMenuItem(value: entry.key, child: Text(entry.value, overflow: TextOverflow.ellipsis))],
                   onChanged: (value) => setState(() => _activity = value),
                 ),
-                if (widget.profile?['weightKg'] != null && widget.profile?['sexParam'] != null) Align(alignment: Alignment.centerLeft, child: TextButton(key: const Key('estimate'), onPressed: _showEstimate, child: const Text('Ver mis calorías'))),
-                ],
+                if (widget.profile?['weightKg'] != null && widget.profile?['sexParam'] != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Align(alignment: Alignment.centerLeft, child: TextButton.icon(key: const Key('estimate'), onPressed: _showEstimate, icon: const Icon(Icons.local_fire_department_outlined, size: 18), label: const Text('Ver mis calorías'))),
+                  ),
               ],
-            ),
-          FilledButton(key: const Key('save-profile'), onPressed: _busy ? null : _save, child: Text(_busy ? 'Guardando…' : 'Guardar perfil')),
-          const SizedBox(height: 16),
-          SectionCard(
-            title: 'Tus consentimientos',
+            ],
+          )
+        : null;
+    final saveBar = ListenableBuilder(listenable: Listenable.merge([_age, _weight, _height]), builder: (context, _) {
+      final dirty = _dirty;
+      return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: tokens.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: dirty ? scheme.primary.withValues(alpha: 0.45) : tokens.border),
+        boxShadow: [if (dirty) BoxShadow(color: scheme.primary.withValues(alpha: 0.18), blurRadius: 24, offset: const Offset(0, 8))],
+      ),
+      child: Row(children: [
+        Icon(dirty ? Icons.edit_note : Icons.check_circle_outline, size: 20, color: dirty ? tokens.streak : tokens.accent),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            dirty ? 'Tienes cambios sin guardar' : widget.profile == null ? 'Completa tus datos y guarda tu perfil' : 'Tu perfil está al día',
+            style: TextStyle(fontWeight: FontWeight.w600, color: dirty ? null : tokens.muted),
+          ),
+        ),
+        const SizedBox(width: 8),
+        FilledButton.icon(
+          key: const Key('save-profile'),
+          onPressed: _busy ? null : _save,
+          icon: _busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save_outlined, size: 18),
+          label: Text(_busy ? 'Guardando…' : 'Guardar perfil'),
+        ),
+      ]),
+    );
+    });
+    final consentsCard = SectionCard(
+      title: 'Tus consentimientos',
+      icon: Icons.verified_user_outlined,
+      iconColor: tokens.info,
+      children: [
+        _consentTile(SwitchListTile(
+          key: const Key('consent-progress'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Registrar mi progreso, incluido el peso', style: TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: const Text('Si lo revocas, se borra tu historial de peso.'),
+          value: _consents['seguimiento_progreso'] ?? false,
+          onChanged: (value) => _toggleConsent('seguimiento_progreso', value),
+        )),
+        _consentTile(SwitchListTile(
+          key: const Key('consent-reminders'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Recordatorios de sesiones pendientes', style: TextStyle(fontWeight: FontWeight.w600)),
+          value: _consents['recordatorios'] ?? false,
+          onChanged: (value) => _toggleConsent('recordatorios', value),
+        )),
+        _consentTile(SwitchListTile(
+          key: const Key('consent-pilot'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Participar en la evaluación del piloto', style: TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: const Text('Usamos tus datos de uso, sin tu nombre ni correo, para evaluar la aplicación. Si lo revocas, sales del piloto y se borran.'),
+          value: _consents['evaluacion_piloto'] ?? false,
+          onChanged: (value) => _toggleConsent('evaluacion_piloto', value),
+        )),
+        const SizedBox(height: 12),
+        Text('Política de datos vigente: $policyVersion', style: Theme.of(context).textTheme.bodySmall),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(key: const Key('policy-link'), onPressed: () => showPrivacyPolicy(context), icon: const Icon(Icons.description_outlined, size: 18), label: const Text('Leer la política de datos')),
+        ),
+      ],
+    );
+    // La barra de guardar queda fija abajo, siempre a mano; el contenido se desplaza por encima de ella.
+    return Form(
+      key: _formKey,
+      child: Column(children: [
+        Expanded(
+          child: PageList(
+            maxWidth: 896,
             children: [
-              SwitchListTile(
-                key: const Key('consent-progress'),
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Registrar mi progreso, incluido el peso'),
-                subtitle: const Text('Si lo revocas, se borra tu historial de peso.'),
-                value: _consents['seguimiento_progreso'] ?? false,
-                onChanged: (value) => _toggleConsent('seguimiento_progreso', value),
-              ),
-              SwitchListTile(
-                key: const Key('consent-reminders'),
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Recordatorios de sesiones pendientes'),
-                value: _consents['recordatorios'] ?? false,
-                onChanged: (value) => _toggleConsent('recordatorios', value),
-              ),
-              SwitchListTile(
-                key: const Key('consent-pilot'),
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Participar en la evaluación del piloto'),
-                subtitle: const Text('Usamos tus datos de uso, sin tu nombre ni correo, para evaluar la aplicación. Si lo revocas, sales del piloto y se borran.'),
-                value: _consents['evaluacion_piloto'] ?? false,
-                onChanged: (value) => _toggleConsent('evaluacion_piloto', value),
-              ),
-              Text('Política de datos vigente: $policyVersion', style: Theme.of(context).textTheme.bodySmall),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(key: const Key('policy-link'), onPressed: () => showPrivacyPolicy(context), child: const Text('Leer la política de datos')),
+              BentoColumns(
+                primaryFlex: 1,
+                secondaryFlex: 1,
+                breakpoint: 840,
+                primary: [profileCard],
+                secondary: [?nutritionCard, consentsCard],
               ),
             ],
           ),
-        ],
-      ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(color: tokens.background, border: Border(top: BorderSide(color: tokens.border))),
+          child: LayoutBuilder(builder: (context, constraints) {
+            final gutter = constraints.maxWidth >= kShellBreakpoint ? 32.0 : 12.0;
+            final side = ((constraints.maxWidth - 896) / 2).clamp(gutter, double.infinity);
+            return Padding(padding: EdgeInsets.fromLTRB(side, 10, side, 10), child: saveBar);
+          }),
+        ),
+      ]),
     );
   }
 }
