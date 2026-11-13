@@ -15,6 +15,14 @@ const _rights = {
   'eliminacion': 'Eliminación: borrar mis datos y mi cuenta',
 };
 const _statusLabels = {'recibida': 'Recibida', 'en_curso': 'En curso', 'resuelta': 'Resuelta', 'rechazada': 'Respondida con fundamento'};
+const _rightIcons = {
+  'acceso': Icons.visibility_outlined,
+  'rectificacion': Icons.edit_outlined,
+  'oposicion': Icons.do_not_disturb_on_outlined,
+  'bloqueo': Icons.pause_circle_outline,
+  'exportacion': Icons.download_outlined,
+  'eliminacion': Icons.delete_outline,
+};
 
 /// Derechos sobre los datos personales (RF009): solicitud con comprobante y plazo.
 class MyDataTab extends StatelessWidget {
@@ -68,41 +76,106 @@ class MyDataTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = FitTokens.of(context);
     return Loader<List<Map<String, dynamic>>>(
       load: () async => ((await api.get('/api/data-requests/me') as Map)['requests'] as List).cast<Map<String, dynamic>>(),
-      builder: (context, requests, reload) => ListView(
-        padding: const EdgeInsets.all(16),
+      builder: (context, requests, reload) => PageList(
+        maxWidth: 768,
         children: [
           SectionCard(
             title: 'Tus derechos sobre tus datos',
+            icon: Icons.shield_outlined,
             children: [
-              const Text('Respondemos en 30 días corridos (2 días hábiles en el bloqueo temporal) y te damos un comprobante.', style: TextStyle(fontSize: 12)),
+              Text('Respondemos en 30 días corridos (2 días hábiles en el bloqueo temporal) y te damos un comprobante.', style: TextStyle(fontSize: 13, color: tokens.muted)),
+              const SizedBox(height: 8),
               for (final entry in _rights.entries)
-                ListTile(
+                _RightTile(
                   key: Key('right-${entry.key}'),
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(entry.value),
-                  trailing: const Icon(Icons.chevron_right),
+                  icon: _rightIcons[entry.key] ?? Icons.policy_outlined,
+                  title: entry.value.split(': ').first,
+                  description: entry.value.split(': ').skip(1).join(': '),
+                  danger: entry.key == 'eliminacion',
                   onTap: () => _request(context, entry.key, reload),
                 ),
             ],
           ),
           SectionCard(
             title: 'Tus solicitudes',
+            icon: Icons.receipt_long_outlined,
+            iconColor: tokens.info,
             children: [
-              if (requests.isEmpty) const Text('Aún no has hecho solicitudes.'),
+              if (requests.isEmpty)
+                EmptyState(icon: Icons.inbox_outlined, color: tokens.muted, title: 'Sin solicitudes', message: const Text('Aún no has hecho solicitudes.')),
               for (final request in requests)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('${request['type']} · ${request['receiptCode']}'),
-                  subtitle: Text('${_statusLabels[request['status']]} · plazo ${formatDateTime(request['dueAt'] as String)}'),
-                  trailing: request['status'] == 'resuelta' && (request['type'] == 'acceso' || request['type'] == 'exportacion')
-                      ? TextButton(key: Key('export-${request['id']}'), onPressed: () => _export(context, request), child: const Text('Ver datos'))
-                      : null,
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                  decoration: BoxDecoration(color: tokens.cardHigh, borderRadius: BorderRadius.circular(14), border: Border.all(color: tokens.border)),
+                  child: Row(children: [
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('${request['type']} · ${request['receiptCode']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                        Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                          Pill(
+                            _statusLabels[request['status']] ?? request['status'] as String,
+                            color: switch (request['status']) { 'resuelta' => tokens.accent, 'rechazada' => tokens.streak, 'en_curso' => tokens.info, _ => null },
+                            strong: true,
+                          ),
+                          Text('Plazo: ${formatDateTime(request['dueAt'] as String)}', style: Theme.of(context).textTheme.bodySmall),
+                        ]),
+                      ]),
+                    ),
+                    if (request['status'] == 'resuelta' && (request['type'] == 'acceso' || request['type'] == 'exportacion'))
+                      TextButton(key: Key('export-${request['id']}'), onPressed: () => _export(context, request), child: const Text('Ver datos')),
+                  ]),
                 ),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Un derecho (acceso, rectificación, oposición, bloqueo, exportación o eliminación): ícono, nombre y qué significa.
+class _RightTile extends StatelessWidget {
+  const _RightTile({super.key, required this.icon, required this.title, required this.description, required this.onTap, this.danger = false});
+  final IconData icon;
+  final String title;
+  final String description;
+  final VoidCallback onTap;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = FitTokens.of(context);
+    final color = danger ? tokens.danger : tokens.accent;
+    final radius = BorderRadius.circular(14);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Material(
+        color: danger ? tokens.danger.withValues(alpha: 0.05) : tokens.cardHigh,
+        shape: RoundedRectangleBorder(borderRadius: radius, side: BorderSide(color: danger ? tokens.danger.withValues(alpha: 0.25) : tokens.border)),
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              IconBadge(icon, color: color, size: 40),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: TextStyle(fontWeight: FontWeight.w800, color: danger ? tokens.danger : null)),
+                  const SizedBox(height: 2),
+                  Text(description, style: TextStyle(fontSize: 13, color: tokens.muted)),
+                ]),
+              ),
+              Icon(Icons.chevron_right, color: tokens.muted),
+            ]),
+          ),
+        ),
       ),
     );
   }

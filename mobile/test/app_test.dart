@@ -1760,7 +1760,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.byKey(const Key('meal-item-almuerzo-pechuga-de-pollo')), 300, scrollable: find.byType(Scrollable).first);
       expect(find.text('150 g'), findsOneWidget);
-      expect(find.text('130 g\n≈ ¾ taza'), findsOneWidget);
+      expect(find.text('130 g'), findsOneWidget);
+      expect(find.text('≈ ¾ taza'), findsOneWidget, reason: 'la medida casera va en su propia etiqueta');
       expect(find.text('Lunes: 2.200 kcal · P 110 g · C 230 g · G 75 g'), findsOneWidget);
       await tester.scrollUntilVisible(find.byKey(const Key('meal-day-2')), -300, scrollable: find.byType(Scrollable).first);
       await tester.tap(find.byKey(const Key('meal-day-2')));
@@ -1779,7 +1780,8 @@ void main() {
       await tester.tap(find.byKey(const Key('meal-day-1')));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.byKey(const Key('meal-item-almuerzo-lentejas')), 300, scrollable: find.byType(Scrollable).first);
-      expect(find.text('250 g\n≈ 1¼ tazas'), findsOneWidget);
+      expect(find.text('250 g'), findsOneWidget);
+      expect(find.text('≈ 1¼ tazas'), findsOneWidget);
     });
 
     testWidgets('si falta un alimento lo cambia por un equivalente aprobado, en una comida o en toda la semana, y puede volver a la pauta original', (tester) async {
